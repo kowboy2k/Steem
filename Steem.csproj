@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <AssemblyName>Steem</AssemblyName>
+    <Product>Steem</Product>
+    <Version>0.12.6</Version>
+    <ApplicationIcon>Steem.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Steem.ico" LogicalName="Steem.ico" />
+    <EmbeddedResource Include="Discussions.ico" LogicalName="Discussions.ico" />
+  </ItemGroup>
+
+</Project>

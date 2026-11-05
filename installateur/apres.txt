@@ -1,0 +1,10 @@
+﻿Steem est installé.
+
+Steem colle la liste de contacts de Steam au bord droit de la fenêtre Steam.
+Pour l'ouvrir : passer la souris tout au bord droit de Steam, ou cliquer sur la languette.
+Les réglages sont dans l'icône de Steem, près de l'horloge.
+
+À régler dans Steam (liste de contacts, roue dentée des réglages) :
+- le clignotement de la fenêtre sur nouveau message doit être sur « Toujours », sinon le volet ne s'ouvre pas tout seul quand un message arrive.
+
+Pour désinstaller : Paramètres Windows > Applications > Steem.

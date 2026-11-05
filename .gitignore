@@ -1,0 +1,10 @@
+bin/
+obj/
+publish/
+diag.txt
+CLAUDE - instructions*.txt
+\#*/
+installateur/publication/
+installateur/Sortie/
+installateur/publication-leger/
+CLAUDE.md

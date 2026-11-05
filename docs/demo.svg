@@ -1,0 +1,232 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 580" width="900" height="580" font-family="Segoe UI, Arial, sans-serif">
+  <title>Steem : démonstration</title>
+  <style>
+    .boucle { animation-duration: 12s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
+    #steamFond, #steamClip { animation-name: steam; }
+    @keyframes steam { 0%, 41% { width: 860px; } 46%, 90% { width: 594px; } 96%, 100% { width: 860px; } }
+    #liste { animation-name: liste; }
+    @keyframes liste { 0%, 21% { transform: translateX(270px); } 26%, 91% { transform: translateX(0); } 97%, 100% { transform: translateX(270px); } }
+    #languette { animation-name: languette; }
+    @keyframes languette { 0%, 21% { transform: translateX(250px); } 26%, 91% { transform: translateX(0); } 97%, 100% { transform: translateX(250px); } }
+    #fermer { animation-name: fermer; }
+    @keyframes fermer { 0%, 22% { opacity: 1; } 24%, 95% { opacity: 0; } 97%, 100% { opacity: 1; } }
+    #ouvrir { animation-name: ouvrir; }
+    @keyframes ouvrir { 0%, 22% { opacity: 0; } 24%, 41% { opacity: 1; } 43%, 100% { opacity: 0; } }
+    #epingle { animation-name: epingle; }
+    @keyframes epingle { 0%, 41% { opacity: 0; } 43%, 95% { opacity: 1; } 97%, 100% { opacity: 0; } }
+    #bonhomme { animation-name: bonhomme; }
+    @keyframes bonhomme { 0%, 22% { opacity: 1; } 24%, 95% { opacity: 0; } 97%, 100% { opacity: 1; } }
+    #vert { animation-name: vert; animation-timing-function: steps(1, end); }
+    @keyframes vert { 0%, 60% { opacity: 0; } 62% { opacity: 1; } 65% { opacity: 0; } 68% { opacity: 1; } 71% { opacity: 0; } 74% { opacity: 1; } 77% { opacity: 0; } 80% { opacity: 1; } 83% { opacity: 0; } 86% { opacity: 1; } 89%, 100% { opacity: 0; } }
+    #message { animation-name: message; }
+    @keyframes message { 0%, 60% { opacity: 0; transform: translateY(14px); } 63%, 87% { opacity: 1; transform: translateY(0); } 90%, 100% { opacity: 0; transform: translateY(0); } }
+    #ouverture { animation-name: ouverture; }
+    @keyframes ouverture { 0%, 4% { opacity: 0; transform: translateY(14px); } 8%, 96% { opacity: 1; transform: none; } 99%, 100% { opacity: 0; transform: translateY(14px); } }
+    #fondSteam { animation-name: fondSteam; }
+    @keyframes fondSteam { 0%, 3% { fill: #23272f; } 5%, 96% { fill: #343a45; } 99%, 100% { fill: #23272f; } }
+    #soulignerSteam { animation-name: souligner; }
+    @keyframes souligner { 0%, 3% { opacity: 0.35; } 5%, 96% { opacity: 1; } 99%, 100% { opacity: 0.35; } }
+    #clicBarre { animation-name: clicBarre; transform-origin: 509px 458px; transform-box: view-box; }
+    @keyframes clicBarre { 0%, 2% { opacity: 0; transform: scale(0.3); } 3% { opacity: 0.9; transform: scale(0.3); } 7%, 100% { opacity: 0; transform: scale(1.6); } }
+    #iconeChats { animation-name: iconeChats; }
+    @keyframes iconeChats { 0%, 60% { opacity: 0; transform: translateY(10px); } 63%, 92% { opacity: 1; transform: none; } 95%, 100% { opacity: 0; transform: translateY(10px); } }
+    #clicChats { animation-name: clicChats; transform-origin: 547px 458px; transform-box: view-box; }
+    @keyframes clicChats { 0%, 70% { opacity: 0; transform: scale(0.3); } 71% { opacity: 0.9; transform: scale(0.3); } 76%, 100% { opacity: 0; transform: scale(1.6); } }
+    #fenetreChat { animation-name: fenetreChat; transform-origin: 547px 458px; transform-box: view-box; animation-timing-function: cubic-bezier(.2,1.4,.4,1); }
+    @keyframes fenetreChat { 0%, 71% { opacity: 0; transform: scale(0.15); } 76%, 91% { opacity: 1; transform: scale(1); } 94%, 100% { opacity: 0; transform: scale(0.15); } }
+    /* Nouvelle discussion : son icône gonfle et clignote en orange (comme Windows), bien visible avant le clic. */
+    #gonfle { animation-name: gonfle; transform-origin: 547px 458px; transform-box: view-box; }
+    @keyframes gonfle { 0%, 62% { transform: scale(1); } 64% { transform: scale(1.9); } 66% { transform: scale(1.35); } 68% { transform: scale(1.9); } 70% { transform: scale(1.35); } 72%, 100% { transform: scale(1); } }
+    #flash { animation-name: flash; animation-timing-function: steps(1, end); }
+    @keyframes flash { 0%, 62% { fill: #2c313a; } 63% { fill: #f0a830; } 65% { fill: #2c313a; } 67% { fill: #f0a830; } 69% { fill: #2c313a; } 70.5% { fill: #f0a830; } 72%, 100% { fill: #2c313a; } }
+    #curseur { animation-name: curseur; }
+    @keyframes curseur {
+      0%, 3% { transform: translate(509px, 458px); }
+      10% { transform: translate(420px, 330px); }
+      19%, 30% { transform: translate(876px, 340px); }
+      38%, 42% { transform: translate(622px, 236px); }
+      52%, 63% { transform: translate(360px, 360px); }
+      70%, 74% { transform: translate(547px, 458px); }
+      82%, 92% { transform: translate(470px, 300px); }
+      100% { transform: translate(509px, 458px); }
+    }
+    #clic { animation-name: clic; transform-origin: 622px 236px; transform-box: view-box; }
+    @keyframes clic { 0%, 39% { opacity: 0; transform: scale(0.3); } 40% { opacity: 0.9; transform: scale(0.3); } 45%, 100% { opacity: 0; transform: scale(1.6); } }
+    .legende { animation-iteration-count: infinite; animation-duration: 12s; opacity: 0; }
+    #l0 { animation-name: l0; } @keyframes l0 { 0%, 11% { opacity: 1; } 13%, 97% { opacity: 0; } 99%, 100% { opacity: 1; } }
+    #l1 { animation-name: l1; } @keyframes l1 { 0%, 13% { opacity: 0; } 15%, 38% { opacity: 1; } 40%, 100% { opacity: 0; } }
+    #l2 { animation-name: l2; } @keyframes l2 { 0%, 40% { opacity: 0; } 42%, 58% { opacity: 1; } 60%, 100% { opacity: 0; } }
+    #l3 { animation-name: l3; } @keyframes l3 { 0%, 60% { opacity: 0; } 62%, 89% { opacity: 1; } 91%, 100% { opacity: 0; } }
+    .tuile { animation-name: tuile; animation-duration: 6s; }
+    @keyframes tuile { 0%, 100% { opacity: 1; } 50% { opacity: 0.86; } }
+    .reflet { animation-name: reflet; animation-duration: 4s; animation-timing-function: linear; }
+    @keyframes reflet { 0% { transform: skewX(-18deg) translateX(0); } 100% { transform: skewX(-18deg) translateX(1300px); } }
+    .enjeu { animation-name: enjeu; animation-duration: 2s; }
+    @keyframes enjeu { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+    @keyframes p0 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(0.0px, 0.0px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p1 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(-51.0px, 0.0px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p2 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(-102.0px, 0.0px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p3 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(-153.0px, 0.0px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p4 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(-204.0px, 0.0px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p5 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(0.0px, -63.6px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p6 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(-51.0px, -63.6px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p7 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(-102.0px, -63.6px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p8 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(-153.0px, -63.6px) scale(0.68); } 96%, 100% { transform: none; } }
+    @keyframes p9 { 0%, 41% { transform: none; } 46%, 90% { transform: translate(-204.0px, -63.6px) scale(0.68); } 96%, 100% { transform: none; } }
+  </style>
+  <defs>
+    <linearGradient id="reflet" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.13"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="g0" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#f0841e" stop-opacity="0.55"/><stop offset="0.55" stop-color="#2a1a10"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g1" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#de9b35" stop-opacity="0.55"/><stop offset="0.55" stop-color="#5b3a1e"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#f5c518" stop-opacity="0.55"/><stop offset="0.55" stop-color="#2a1408"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#af8f5a" stop-opacity="0.55"/><stop offset="0.55" stop-color="#1d140c"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g4" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#e0e4ea" stop-opacity="0.55"/><stop offset="0.55" stop-color="#1c1f26"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g5" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#f2a900" stop-opacity="0.55"/><stop offset="0.55" stop-color="#3a0f12"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g6" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#3fa9f5" stop-opacity="0.55"/><stop offset="0.55" stop-color="#1e2226"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g7" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#7fb3d5" stop-opacity="0.55"/><stop offset="0.55" stop-color="#10202e"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g8" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#da292a" stop-opacity="0.55"/><stop offset="0.55" stop-color="#1b1b1b"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <linearGradient id="g9" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#b7202e" stop-opacity="0.55"/><stop offset="0.55" stop-color="#3a0c0c"/><stop offset="1" stop-color="#0d1117"/></linearGradient>
+    <clipPath id="ecran"><rect x="20" y="20" width="860" height="420" rx="8"/></clipPath>
+    <clipPath id="clipSteam"><rect id="steamClip" class="boucle" x="20" y="20" width="860" height="420"/></clipPath>
+  </defs>
+  <rect width="900" height="580" fill="#0b0e13"/>
+  <rect x="20" y="20" width="860" height="456" rx="8" fill="#0e1218"/>
+  <g id="ouverture" class="boucle">
+  <g clip-path="url(#ecran)">
+    <!-- Fenêtre Steam (schéma) -->
+    <rect id="steamFond" class="boucle" x="20" y="20" width="860" height="420" fill="#1b2838"/>
+    <g clip-path="url(#clipSteam)">
+      <rect x="20" y="20" width="860" height="40" fill="#171d25"/>
+      <text x="40" y="46" fill="#c7d5e0" font-size="15" font-weight="600" letter-spacing="2">STEAM</text>
+      <g fill="#8f98a0" font-size="12"><text x="130" y="45">MAGASIN</text><text x="210" y="45">BIBLIOTHÈQUE</text><text x="320" y="45">COMMUNAUTÉ</text></g>
+      <g id="jeux">
+        <g class="boucle" style="animation-name:p0;transform-box:view-box;transform-origin:40px 80px">
+        <g class="tuile boucle" style="animation-delay:-0.0s"><rect x="40" y="80" width="150" height="180" rx="4" fill="url(#g0)"/><circle cx="115" cy="156" r="26" fill="none" stroke="#f0841e" stroke-width="3"/><path d="M103 140H111L129 172M116 152L103 172" stroke="#f0841e" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="115" y="244" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="800" letter-spacing="0.8">HALF-LIFE 3</text></g>
+        <g class="enjeu boucle"><rect x="48" y="88" width="62" height="18" rx="3" fill="#a4d007"/><text x="79" y="101" text-anchor="middle" font-size="10" font-weight="700" fill="#10160a">EN JEU</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p1;transform-box:view-box;transform-origin:205px 80px">
+        <g class="tuile boucle" style="animation-delay:-0.9s"><rect x="205" y="80" width="150" height="180" rx="4" fill="url(#g1)"/><circle cx="280" cy="156" r="22" fill="none" stroke="#de9b35" stroke-width="3"/><path d="M280 124V146M280 166V188M248 156H270M290 156H312" stroke="#de9b35" stroke-width="3"/><circle cx="280" cy="156" r="3" fill="#de9b35"/><text x="280" y="244" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" letter-spacing="0.8">COUNTER FORTRESS 2</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p2;transform-box:view-box;transform-origin:370px 80px">
+        <g class="tuile boucle" style="animation-delay:-1.8s"><rect x="370" y="80" width="150" height="180" rx="4" fill="url(#g2)"/><rect x="425" y="136" width="40" height="40" transform="rotate(45 445 156)" fill="none" stroke="#f5c518" stroke-width="3"/><path d="M431 170L459 142" stroke="#f5c518" stroke-width="5"/><text x="445" y="244" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="800" letter-spacing="0.8">DOTA RIVALS</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p3;transform-box:view-box;transform-origin:535px 80px">
+        <g class="tuile boucle" style="animation-delay:-2.7s"><rect x="535" y="80" width="150" height="180" rx="4" fill="url(#g3)"/><path d="M610 128L617 148L638 148L621 161L627 182L610 169L593 182L599 161L582 148L603 148Z" fill="#af8f5a"/><text x="610" y="244" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" letter-spacing="0.8">MARVEL OF EXILE</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p4;transform-box:view-box;transform-origin:700px 80px">
+        <g class="tuile boucle" style="animation-delay:-3.6s"><rect x="700" y="80" width="150" height="180" rx="4" fill="url(#g4)"/><circle cx="775" cy="156" r="24" fill="none" stroke="#e0e4ea" stroke-width="2"/><circle cx="775" cy="156" r="16" fill="none" stroke="#e0e4ea" stroke-width="1.2" stroke-dasharray="4 3"/><path d="M775 144L785 164H765Z" fill="#e0e4ea"/><text x="775" y="244" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" letter-spacing="0.8">PATH OF DESTINY</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p5;transform-box:view-box;transform-origin:40px 280px">
+        <g class="tuile boucle" style="animation-delay:-4.5s"><rect x="40" y="280" width="150" height="140" rx="4" fill="url(#g5)"/><path d="M87 339Q115 303 143 339Z" fill="#f2a900"/><path d="M87 339L115 365L143 339M115 329V365" stroke="#f2a900" stroke-width="1.6" fill="none"/><rect x="110" y="363" width="10" height="9" fill="#f2a900"/><text x="115" y="404" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="800" letter-spacing="0.8">PUBG LEGENDS</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p6;transform-box:view-box;transform-origin:205px 280px">
+        <g class="tuile boucle" style="animation-delay:-5.4s"><rect x="205" y="280" width="150" height="140" rx="4" fill="url(#g6)"/><ellipse cx="264" cy="339" rx="10" ry="24" fill="none" stroke="#3fa9f5" stroke-width="4"/><ellipse cx="296" cy="339" rx="10" ry="24" fill="none" stroke="#f68b1f" stroke-width="4"/><text x="280" y="404" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" letter-spacing="0.8">PORTAL THUNDER</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p7;transform-box:view-box;transform-origin:370px 280px">
+        <g class="tuile boucle" style="animation-delay:-6.3s"><rect x="370" y="280" width="150" height="140" rx="4" fill="url(#g7)"/><path d="M445 315L467 327V351L445 363L423 351V327Z M423 327L445 339L467 327M445 339V363" fill="none" stroke="#7fb3d5" stroke-width="3" stroke-linejoin="round"/><text x="445" y="404" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="800" letter-spacing="0.8">GARRY'S STRIKE</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p8;transform-box:view-box;transform-origin:535px 280px">
+        <g class="tuile boucle" style="animation-delay:-7.2s"><rect x="535" y="280" width="150" height="140" rx="4" fill="url(#g8)"/><path d="M610 311L636 361H622L610 337L598 361H584Z" fill="#da292a"/><path d="M603 351H617L610 341Z" fill="#da292a"/><text x="610" y="404" text-anchor="middle" fill="#ffffff" font-size="10.5" font-weight="800" letter-spacing="0.8">APEX FRAME</text></g>
+        </g>
+        <g class="boucle" style="animation-name:p9;transform-box:view-box;transform-origin:700px 280px">
+        <g class="tuile boucle" style="animation-delay:-8.1s"><rect x="700" y="280" width="150" height="140" rx="4" fill="url(#g9)"/><circle cx="775" cy="327" r="11" fill="none" stroke="#b7202e" stroke-width="3"/><circle cx="763" cy="348" r="11" fill="none" stroke="#b7202e" stroke-width="3"/><circle cx="787" cy="348" r="11" fill="none" stroke="#b7202e" stroke-width="3"/><circle cx="775" cy="341" r="4" fill="#b7202e"/><text x="775" y="404" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="800" letter-spacing="0.8">LEFT 4 MODS</text></g>
+        </g>
+        <rect class="reflet boucle" x="-160" y="60" width="90" height="380" fill="url(#reflet)" transform="skewX(-18)"/>
+      </g>
+    </g>
+    <!-- Liste de contacts -->
+    <g id="liste" class="boucle">
+      <rect x="628" y="20" width="252" height="420" fill="#1e2329"/>
+      <rect x="628" y="20" width="252" height="40" fill="#171a21"/>
+      <circle cx="650" cy="40" r="11" fill="#66c0f4"/>
+      <rect x="668" y="33" width="80" height="7" rx="3" fill="#c7d5e0"/>
+      <rect x="668" y="44" width="50" height="5" rx="2" fill="#66c0f4"/>
+      <g>
+        <rect x="640" y="76" width="30" height="30" rx="3" fill="#5c7e10"/><rect x="680" y="80" width="110" height="7" rx="3" fill="#a4d007"/><rect x="680" y="92" width="80" height="5" rx="2" fill="#5c7e10"/>
+        <rect x="640" y="116" width="30" height="30" rx="3" fill="#2a6f97"/><rect x="680" y="120" width="90" height="7" rx="3" fill="#6dcff6"/><rect x="680" y="132" width="60" height="5" rx="2" fill="#3d6e9a"/>
+        <rect x="640" y="156" width="30" height="30" rx="3" fill="#2a6f97"/><rect x="680" y="160" width="120" height="7" rx="3" fill="#6dcff6"/><rect x="680" y="172" width="70" height="5" rx="2" fill="#3d6e9a"/>
+        <rect x="640" y="196" width="30" height="30" rx="3" fill="#3d4450"/><rect x="680" y="200" width="100" height="7" rx="3" fill="#898989"/><rect x="680" y="212" width="90" height="5" rx="2" fill="#555"/>
+        <rect x="640" y="236" width="30" height="30" rx="3" fill="#3d4450"/><rect x="680" y="240" width="80" height="7" rx="3" fill="#898989"/><rect x="680" y="252" width="70" height="5" rx="2" fill="#555"/>
+        <rect x="640" y="276" width="30" height="30" rx="3" fill="#3d4450"/><rect x="680" y="280" width="115" height="7" rx="3" fill="#898989"/><rect x="680" y="292" width="60" height="5" rx="2" fill="#555"/>
+        <rect x="640" y="316" width="30" height="30" rx="3" fill="#3d4450"/><rect x="680" y="320" width="95" height="7" rx="3" fill="#898989"/><rect x="680" y="332" width="85" height="5" rx="2" fill="#555"/>
+      </g>
+    </g>
+    <!-- Languette : chevron + bonhomme -->
+    <g id="languette" class="boucle">
+      <path d="M630 190 H614 a8 8 0 0 0 -8 8 V276 a8 8 0 0 0 8 8 H630 Z" fill="#35383c"/>
+      <g fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path id="fermer" class="boucle" d="M622 228 l-5 9 l5 9" stroke="#c7d5e0"/>
+        <path id="ouvrir" class="boucle" d="M616 228 l5 9 l-5 9" stroke="#c7d5e0"/>
+        <path id="epingle" class="boucle" d="M616 228 l5 9 l-5 9" stroke="#66c0f4"/>
+      </g>
+      <g id="bonhomme" class="boucle" fill="#6dcff6"><circle cx="619" cy="201" r="3.6"/><path d="M613 213 v-3 a6 5 0 0 1 12 0 v3 z"/></g>
+    </g>
+    <!-- Nouveau message -->
+    <g id="message" class="boucle">
+      <rect x="652" y="372" width="214" height="52" rx="6" fill="#2a475e" stroke="#66c0f4" stroke-width="1"/>
+      <rect x="664" y="384" width="28" height="28" rx="3" fill="#5c7e10"/>
+      <rect x="702" y="388" width="90" height="7" rx="3" fill="#a4d007"/>
+      <rect x="702" y="401" width="140" height="6" rx="3" fill="#c7d5e0"/>
+    </g>
+  </g>
+  </g>
+
+  <!-- Barre des tâches -->
+  <g>
+    <rect x="20" y="440" width="860" height="36" fill="#1c1f26"/>
+    <rect x="20" y="440" width="860" height="1" fill="#2c313a"/>
+    <g fill="#5aa0e6"><rect x="331" y="449" width="8" height="8" rx="1"/><rect x="341" y="449" width="8" height="8" rx="1"/><rect x="331" y="459" width="8" height="8" rx="1"/><rect x="341" y="459" width="8" height="8" rx="1"/></g>
+    <circle cx="383" cy="457" r="6" fill="none" stroke="#c7d5e0" stroke-width="2"/><path d="M387 461 l5 5" stroke="#c7d5e0" stroke-width="2" stroke-linecap="round"/>
+    <path d="M412 452 h8 l2 3 h12 v12 h-22 z" fill="#e8b84a"/>
+    <circle cx="465" cy="458" r="10" fill="#3d7bd9"/><circle cx="465" cy="458" r="4" fill="#e8eef6"/>
+    <g id="iconeSteam">
+      <rect id="fondSteam" class="boucle" x="494" y="443" width="30" height="30" rx="4" fill="#2c313a"/>
+      <circle cx="509" cy="457" r="10" fill="#1b2838" stroke="#66c0f4" stroke-width="1.5"/>
+      <circle cx="512" cy="454" r="3.2" fill="none" stroke="#c7d5e0" stroke-width="1.6"/><path d="M503 461 l7 -5" stroke="#c7d5e0" stroke-width="1.6" stroke-linecap="round"/>
+      <rect id="soulignerSteam" class="boucle" x="502" y="471" width="14" height="3" rx="1.5" fill="#66c0f4"/>
+    </g>
+    <g id="iconeChats" class="boucle">
+     <g id="gonfle" class="boucle">
+      <rect id="flash" class="boucle" x="532" y="443" width="30" height="30" rx="4" fill="#2c313a"/>
+      <circle cx="545" cy="458" r="8" fill="#1b2838" stroke="#66c0f4" stroke-width="1.2"/>
+      <path d="M546 448 h11 a3 3 0 0 1 3 3 v5 a3 3 0 0 1 -3 3 h-2 l1 4 l-5 -4 h-5 a3 3 0 0 1 -3 -3 v-5 a3 3 0 0 1 3 -3 z" fill="#ffffff"/>
+      <rect x="540" y="471" width="14" height="3" rx="1.5" fill="#f0a830"/>
+     </g>
+    </g>
+    <text x="862" y="462" text-anchor="end" font-size="11" fill="#c7d5e0">13:37</text>
+  </g>
+  <circle id="clicBarre" class="boucle" cx="509" cy="458" r="16" fill="none" stroke="#66c0f4" stroke-width="3"/>
+
+  <!-- Fenêtre de discussion, ouverte depuis son icône de la barre des tâches -->
+  <g id="fenetreChat" class="boucle">
+    <rect x="300" y="110" width="300" height="318" rx="8" fill="#1e2329" stroke="#3d4450"/>
+    <rect x="300" y="110" width="300" height="44" rx="8" fill="#171a21"/>
+    <rect x="300" y="146" width="300" height="8" fill="#171a21"/>
+    <rect x="312" y="119" width="26" height="26" rx="3" fill="#5c7e10"/>
+    <rect x="346" y="123" width="90" height="7" rx="3" fill="#a4d007"/>
+    <rect x="346" y="135" width="60" height="5" rx="2" fill="#5c7e10"/>
+    <g fill="#8f98a0"><rect x="548" y="128" width="9" height="2"/><rect x="565" y="124" width="9" height="9" fill="none" stroke="#8f98a0" stroke-width="1.5"/><path d="M582 124 l9 9 M591 124 l-9 9" stroke="#8f98a0" stroke-width="1.5"/></g>
+    <rect x="314" y="170" width="150" height="26" rx="10" fill="#2a3a4a"/>
+    <rect x="314" y="204" width="110" height="26" rx="10" fill="#2a3a4a"/>
+    <rect x="430" y="242" width="156" height="26" rx="10" fill="#2a6f97"/>
+    <rect x="314" y="280" width="170" height="40" rx="10" fill="#2a3a4a"/>
+    <rect x="326" y="290" width="120" height="6" rx="3" fill="#c7d5e0"/>
+    <rect x="326" y="302" width="90" height="6" rx="3" fill="#c7d5e0"/>
+    <rect x="312" y="384" width="276" height="32" rx="6" fill="#2c313a"/>
+    <rect x="324" y="397" width="80" height="6" rx="3" fill="#5c6b7a"/>
+  </g>
+  <circle id="clicChats" class="boucle" cx="547" cy="458" r="16" fill="none" stroke="#66c0f4" stroke-width="3"/>
+
+  <!-- Clic et curseur -->
+  <circle id="clic" class="boucle" cx="622" cy="236" r="16" fill="none" stroke="#66c0f4" stroke-width="3"/>
+  <g id="curseur" class="boucle">
+    <path d="M0 0 V18 L4.5 13.5 L8 21 L11 19.6 L7.6 12.4 H13.5 Z" fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/>
+  </g>
+  <!-- Légendes -->
+  <g font-size="17" text-anchor="middle" fill="#c7d5e0">
+    <g id="l0" class="legende"><text x="450" y="520">Steam et ses contacts : une seule fenêtre.</text><text x="450" y="546" font-size="13" fill="#8f98a0">Steam and friends: one window.</text></g>
+    <g id="l1" class="legende"><text x="450" y="520">Bord droit : le volet s'ouvre.</text><text x="450" y="546" font-size="13" fill="#8f98a0">Right edge: the panel opens.</text></g>
+    <g id="l2" class="legende"><text x="450" y="520">Un clic : épinglé, Steam se range.</text><text x="450" y="546" font-size="13" fill="#8f98a0">One click: pinned, Steam makes room.</text></g>
+    <g id="l3" class="legende"><text x="450" y="520">Nouveau message : sa propre icône.</text><text x="450" y="546" font-size="13" fill="#8f98a0">New message: its own button.</text></g>
+  </g>
+</svg>
