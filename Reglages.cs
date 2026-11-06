@@ -7,7 +7,7 @@ sealed class Reglages
     public bool Epingle { get; set; }
     public bool SteamReduit { get; set; }          // Steam rétréci pour le côte à côte
     public int ReductionSteam { get; set; }        // de combien (px réels), rendu à la sortie
-    public bool Gouttiere { get; set; }            // épinglé : gouttière pleine hauteur entre Steam et la liste, au lieu de la languette
+    public bool Gouttiere { get; set; } = true;         // épinglé : gouttière pleine hauteur entre Steam et la liste, au lieu de la languette
     public int Largeur { get; set; }               // pixels réels, reprise de la liste de contacts
     public int MargeHaute { get; set; } = 40;      // laisse libres les boutons de fenêtre de Steam (à 100 %)
     public int BordSurvol { get; set; } = 3;        // bande du bord droit de Steam qui déplie au survol (tout au bord)

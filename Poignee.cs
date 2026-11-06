@@ -202,7 +202,9 @@ sealed class Poignee : Form
         }
 
         using var forme = Forme(r, rayon);
-        using (var bf = new SolidBrush(Fond)) g.FillPath(bf, forme);
+        // Gouttière : la couleur de la languette assombrie de moitié (#35383c → #1b1c1e).
+        var fond = gouttiere ? Color.FromArgb(Fond.R / 2, Fond.G / 2, Fond.B / 2) : Fond;
+        using (var bf = new SolidBrush(fond)) g.FillPath(bf, forme);
 
         g.TranslateTransform(m, m);
         var etat = g.Save();
