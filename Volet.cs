@@ -29,7 +29,9 @@ sealed class Volet : IDisposable
     IntPtr contactsConnus;
     Rectangle rectInitial;
     bool listeReduite; // liste réduite par nous en même temps que Steam
-    readonly HashSet<IntPtr> signales = []; // fenêtres Steam déjà comptées comme « nouveau message », pas encore activées
+    readonly HashSet<IntPtr> serieComptee = []; // série de clignotements en cours déjà comptée
+    readonly Dictionary<IntPtr, long> dernierSignal = []; // heure du dernier 0x8006 par fenêtre
+    readonly HashSet<IntPtr> signales = [];// fenêtres Steam déjà comptées comme « nouveau message », pas encore activées
 
     // Trace des clignotements reçus (%APPDATA%\Steem\messages.log, 100 Ko au plus) pour vérifier les faux positifs.
     static void Journal(IntPtr h, bool compte)
@@ -58,9 +60,18 @@ sealed class Volet : IDisposable
             if (code == 0x8006 && h != steam.Principale && steam.EstSteam(h))
             {
                 // 0x8006 (HSHELL_FLASH) revient aussi quand une fenêtre DÉJÀ signalée (bouton resté orange) est
-                // redessinée, par ex. une discussion qui se réactualise : faux nouveau message (Kev, 06/11). On ne
-                // compte donc qu'un clignotement par fenêtre tant qu'elle n'a pas été activée.
-                bool nouveau = signales.Add(h) && h != Native.GetForegroundWindow();
+                // redessinée, par ex. une discussion qui se réactualise : faux nouveau message (Kev, 06/11). Un vrai
+                // message fait clignoter le bouton : un 0x8006 par seconde environ, en série (journal du 06/11).
+                // Fenêtre déjà signalée : compte le 2e signal d'une NOUVELLE série (après 3 s de silence), jamais un
+                // signal isolé ni la suite d'une série déjà comptée.
+                long maintenant = Environment.TickCount64;
+                bool connu = dernierSignal.TryGetValue(h, out var avant);
+                if (!connu || maintenant - avant > 3000) serieComptee.Remove(h); // silence : une nouvelle série commence
+                bool rafale = connu && maintenant - avant < 1500 && serieComptee.Add(h);
+                dernierSignal[h] = maintenant;
+                bool premier = signales.Add(h);
+                if (premier) serieComptee.Add(h);
+                bool nouveau = (premier || rafale) && h != Native.GetForegroundWindow();
                 Journal(h, nouveau);
                 if (nouveau)
                 {
