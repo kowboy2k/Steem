@@ -29,6 +29,20 @@ sealed class Volet : IDisposable
     IntPtr contactsConnus;
     Rectangle rectInitial;
     bool listeReduite; // liste réduite par nous en même temps que Steam
+    readonly HashSet<IntPtr> signales = []; // fenêtres Steam déjà comptées comme « nouveau message », pas encore activées
+
+    // Trace des clignotements reçus (%APPDATA%\Steem\messages.log, 100 Ko au plus) pour vérifier les faux positifs.
+    static void Journal(IntPtr h, bool compte)
+    {
+        try
+        {
+            var dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Steem");
+            var f = Path.Combine(dossier, "messages.log");
+            if (File.Exists(f) && new FileInfo(f).Length > 100_000) File.Delete(f);
+            File.AppendAllText(f, $"{DateTime.Now:dd/MM/yyyy HH:mm:ss} {(compte ? "COMPTÉ " : "ignoré ")} {h} « {Native.Titre(h)} »{Environment.NewLine}");
+        }
+        catch { }
+    }
 
     public Volet(Reglages r)
     {
@@ -39,10 +53,20 @@ sealed class Volet : IDisposable
         poignee.ClicEpingle += () => { if (!OuvrirContactsSiAbsents()) BasculerEpingle(); };
         crochet.Evenement += (code, h) =>
         {
+            // Fenêtre activée : son bouton de barre des tâches n'est plus orange, un prochain clignotement compte de nouveau.
+            if (code is 4 or 0x8004) signales.Remove(h);
             if (code == 0x8006 && h != steam.Principale && steam.EstSteam(h))
             {
-                retenuJusqua = Environment.TickCount64 + reglages.DelaiMessageMs;
-                nonLu = true;
+                // 0x8006 (HSHELL_FLASH) revient aussi quand une fenêtre DÉJÀ signalée (bouton resté orange) est
+                // redessinée, par ex. une discussion qui se réactualise : faux nouveau message (Kev, 06/11). On ne
+                // compte donc qu'un clignotement par fenêtre tant qu'elle n'a pas été activée.
+                bool nouveau = signales.Add(h) && h != Native.GetForegroundWindow();
+                Journal(h, nouveau);
+                if (nouveau)
+                {
+                    retenuJusqua = Environment.TickCount64 + reglages.DelaiMessageMs;
+                    nonLu = true;
+                }
             }
             // Activation, clignotement ou titre changé : l'Explorateur peut remettre le bouton, on le retire aussitôt.
             if (h == steam.Contacts && horsBarre) prochainRetrait = 0;
@@ -169,6 +193,7 @@ sealed class Volet : IDisposable
         var premier = Native.GetForegroundWindow();
         if (fermeForcee && premier != steam.Contacts) fermeForcee = false;
         if (premier == steam.Contacts) nonLu = false;
+        signales.Remove(premier);
         // Un clic dans la liste activée par nous : elle devient la fenêtre de travail, plus de repli au départ de la souris.
         if (activeParNous && bouton && !boutonAvant && tiroir.Contains(souris)) activeParNous = false;
 
