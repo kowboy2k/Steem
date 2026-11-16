@@ -29,6 +29,7 @@ sealed class Volet : IDisposable
     IntPtr contactsConnus;
     Rectangle rectInitial;
     bool listeReduite; // liste réduite par nous en même temps que Steam
+    bool pleinEcran;   // Steam en plein écran (vidéo) : volet replié, rien n'est déplacé
     readonly HashSet<IntPtr> serieComptee = []; // série de clignotements en cours déjà comptée
     readonly Dictionary<IntPtr, long> dernierSignal = []; // heure du dernier 0x8006 par fenêtre
     readonly HashSet<IntPtr> signales = [];// fenêtres Steam déjà comptées comme « nouveau message », pas encore activées
@@ -121,7 +122,12 @@ sealed class Volet : IDisposable
             horsBarre = true;
             prochainRetrait = t + 2000;
         }
-        if (t >= prochainTri) { TrierDiscussions(); statut = StatutSteam.Lire(); prochainTri = t + 2000; }
+        if (t >= prochainTri)
+        {
+            TrierDiscussions(); statut = StatutSteam.Lire(); prochainTri = t + 2000;
+            // Coins carrés sans liseré côte à côte (remis si Steam recrée ses fenêtres).
+            if (cote) { Native.Carre(s, true); if (contactsOk) Native.Carre(steam.Contacts, true); }
+        }
 
         // Steam réduit, fermé dans la zone de notification ou sur un autre bureau : on ne gère plus.
         if (!Native.IsWindowVisible(s) || Native.IsIconic(s) || Native.Masquee(s))
@@ -139,6 +145,27 @@ sealed class Volet : IDisposable
             return;
         }
         gere = true;
+
+        // Vidéo en plein écran dans Steam : Steam couvre tout l'écran (barre des tâches comprise). On le laisse faire
+        // (avant, le côte à côte le ramenait à sa place et comptait l'écart comme un excédent) et on replie le volet.
+        var ecran = Screen.FromHandle(s).Bounds;
+        var vsPlein = Native.Visuel(s);
+        if (!Native.IsZoomed(s) && vsPlein.Left <= ecran.Left && vsPlein.Top <= ecran.Top
+            && vsPlein.Right >= ecran.Right && vsPlein.Bottom >= ecran.Bottom)
+        {
+            if (!pleinEcran && contactsOk) Native.PlacerSous(steam.Contacts, s);
+            pleinEcran = true; deplie = false;
+            CacherPoignee();
+            return;
+        }
+        if (pleinEcran)
+        {
+            // Sortie du plein écran : Steam reprend sa place, la liste et la languette suivent.
+            pleinEcran = false;
+            derniereCible = Rectangle.Empty;
+            pauseJusqua = t + 250;
+            return;
+        }
         if (listeReduite)
         {
             // Steam revenu : la liste réduite avec lui revient, sans prendre le focus.
@@ -354,6 +381,9 @@ sealed class Volet : IDisposable
         else if (!Native.IsZoomed(s))
         {
             var v = Native.Visuel(s);
+            // Jamais au-delà du bord de l'écran : une réduction mal comptée (766 px au lieu de 383 le 16/11, après une
+            // vidéo en plein écran) aurait fait déborder Steam.
+            if (v.Right < travail.Right) d = Math.Min(d, travail.Right - v.Right);
             var r = new Rectangle(v.X, v.Y, v.Width + d, v.Height);
             if (Math.Abs(r.Left - travail.Left) <= 2 && Math.Abs(r.Top - travail.Top) <= 2
                 && r.Right >= travail.Right - 2 && Math.Abs(r.Bottom - travail.Bottom) <= 2) // au-delà : Steam avait gardé quelques px de trop
@@ -362,6 +392,8 @@ sealed class Volet : IDisposable
                 Native.Placer(s, Native.RectPourVisuel(s, r), true);
         }
         cote = actif;
+        Native.Carre(s, actif);
+        if (steam.ContactsOk) Native.Carre(steam.Contacts, actif);
         corrections = 0;
         reglages.SteamReduit = actif;
         reglages.ReductionSteam = actif ? d : 0;

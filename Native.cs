@@ -106,6 +106,18 @@ static class Native
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint RegisterWindowMessage(string s);
     [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out RECT r, int size);
     [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int v, int size);
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int v, int size);
+
+    // Windows 11 arrondit les coins et trace un liseré de 1 px autour des fenêtres non agrandies : côte à côte, le fond
+    // se voyait autour de Steam et de la liste. Carré = ni coins arrondis ni liseré (marche aussi sur les fenêtres de Steam).
+    public static void Carre(IntPtr h, bool carre)
+    {
+        if (h == IntPtr.Zero) return;
+        int coins = carre ? 1 : 0;                 // DWMWCP_DONOTROUND / DWMWCP_DEFAULT
+        int bord = carre ? -2 : -1;                // DWMWA_COLOR_NONE (0xFFFFFFFE) / DWMWA_COLOR_DEFAULT (0xFFFFFFFF)
+        DwmSetWindowAttribute(h, 33, ref coins, 4); // DWMWA_WINDOW_CORNER_PREFERENCE
+        DwmSetWindowAttribute(h, 34, ref bord, 4);  // DWMWA_BORDER_COLOR
+    }
 
     const uint GW_HWNDNEXT = 2, GW_HWNDPREV = 3;
     public const uint GW_OWNER = 4;
