@@ -114,7 +114,9 @@ static class Native
     {
         if (h == IntPtr.Zero) return;
         int coins = carre ? 1 : 0;                 // DWMWCP_DONOTROUND / DWMWCP_DEFAULT
-        int bord = carre ? -2 : -1;                // DWMWA_COLOR_NONE (0xFFFFFFFE) / DWMWA_COLOR_DEFAULT (0xFFFFFFFF)
+        // Liseré gardé (Kev, 16/11) mais opaque, gris de Steam #3d4450 (COLORREF 0x00BBGGRR) : le liseré par défaut,
+        // translucide, laissait voir le fond. Hors côte à côte : DWMWA_COLOR_DEFAULT (0xFFFFFFFF).
+        int bord = carre ? 0x0050443D : -1;
         DwmSetWindowAttribute(h, 33, ref coins, 4); // DWMWA_WINDOW_CORNER_PREFERENCE
         DwmSetWindowAttribute(h, 34, ref bord, 4);  // DWMWA_BORDER_COLOR
     }
