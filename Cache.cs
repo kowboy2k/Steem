@@ -40,23 +40,34 @@ sealed class Cache : Form
         base.WndProc(ref m);
     }
 
-    // Couleur prise juste à gauche des boutons, pour suivre le thème de Steam.
-    public void Accorder(IntPtr contacts, float k)
+    // Fond copié de l'en-tête de la liste, juste à gauche des boutons : une colonne de pixels étirée sur toute la
+    // largeur. L'en-tête de Steam est en dégradé (haut plus clair) : une couleur unie laissait voir la zone cachée (16/11).
+    public void Accorder(IntPtr contacts, Rectangle zone, float k)
     {
         var r = Native.Rect(contacts);
-        if (r.Width <= 0 || r.Height <= 0) return;
+        if (r.Width <= 0 || r.Height <= 0 || zone.Width <= 0 || zone.Height <= 0) return;
         try
         {
-            using var b = new Bitmap(r.Width, Math.Min(r.Height, (int)(60 * k)));
+            using var b = new Bitmap(r.Width, Math.Min(r.Height, zone.Bottom - r.Top + 2));
             using (var g = Graphics.FromImage(b))
             {
                 var dc = g.GetHdc();
                 Native.PrintWindow(contacts, dc, 2);
                 g.ReleaseHdc(dc);
             }
-            int x = Math.Max(0, r.Width - (int)(120 * k)), y = Math.Min(b.Height - 1, (int)(20 * k));
-            var c = b.GetPixel(x, y);
-            if (c.A == 255 && c.R + c.G + c.B > 0) BackColor = c;
+            int x = Math.Clamp(zone.Left - r.Left - (int)(6 * k), 0, b.Width - 1);
+            var fond = new Bitmap(zone.Width, zone.Height);
+            for (int y = 0; y < zone.Height; y++)
+            {
+                var c = b.GetPixel(x, Math.Clamp(zone.Top - r.Top + y, 0, b.Height - 1));
+                if (c.A != 255 || c.R + c.G + c.B == 0) { fond.Dispose(); return; } // capture ratée : on garde l'ancien fond
+                for (int i = 0; i < zone.Width; i++) fond.SetPixel(i, y, c);
+            }
+            BackColor = fond.GetPixel(0, zone.Height / 2);
+            var avant = BackgroundImage;
+            BackgroundImage = fond;
+            BackgroundImageLayout = ImageLayout.None;
+            avant?.Dispose();
         }
         catch { }
     }

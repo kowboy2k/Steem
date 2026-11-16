@@ -305,11 +305,11 @@ sealed class Volet : IDisposable
         // Gouttière (épinglé) : la liste garde ses boutons Réduire / Agrandir / Fermer, pas de cache.
         if (deplie && !(cote && reglages.Gouttiere))
         {
-            if (!cacheVisible) cache.Accorder(steam.Contacts, k);
             var vc = Native.Visuel(steam.Contacts);
             // Décalé d'un pixel en haut et à droite : le liseré de Windows autour de la liste reste visible.
             int marge = Math.Max(1, (int)k);
             var rc = new Rectangle(vc.Right - (int)(108 * k) - marge, vc.Top + marge, (int)(108 * k), (int)(36 * k));
+            if (!cacheVisible) cache.Accorder(steam.Contacts, rc, k);
             if (!cacheVisible || rc != rectCache)
             {
                 Native.Placer(cache.Handle, rc, false);
