@@ -125,8 +125,9 @@ sealed class Volet : IDisposable
         if (t >= prochainTri)
         {
             TrierDiscussions(); statut = StatutSteam.Lire(); prochainTri = t + 2000;
-            // Steam et la liste : coins carrés, sans liseré, tout le temps (remis si Steam recrée ses fenêtres).
-            Native.Carre(s, true); if (contactsOk) Native.Carre(steam.Contacts, true);
+            // Steam : coins carrés, sans liseré. La liste : pareil côte à côte, mais liseré de Windows gardé quand elle
+            // s'ouvre par-dessus Steam (Kev, 16/11). Réappliqué si Steam recrée ses fenêtres.
+            Native.Carre(s, true); if (contactsOk) Native.Carre(steam.Contacts, cote);
         }
 
         // Steam réduit, fermé dans la zone de notification ou sur un autre bureau : on ne gère plus.
@@ -392,6 +393,7 @@ sealed class Volet : IDisposable
                 Native.Placer(s, Native.RectPourVisuel(s, r), true);
         }
         cote = actif;
+        if (steam.ContactsOk) Native.Carre(steam.Contacts, actif);
         corrections = 0;
         reglages.SteamReduit = actif;
         reglages.ReductionSteam = actif ? d : 0;
