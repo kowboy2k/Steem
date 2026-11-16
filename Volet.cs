@@ -29,7 +29,8 @@ sealed class Volet : IDisposable
     IntPtr contactsConnus;
     Rectangle rectInitial;
     bool listeReduite; // liste réduite par nous en même temps que Steam
-    bool pleinEcran;   // Steam en plein écran (vidéo) : volet replié, rien n'est déplacé
+    long cacheDepuis, prochainAccord; // apparition du cache, prochaine capture de l'en-tête
+    bool pleinEcran; // Steam en plein écran (vidéo) : volet replié, rien n'est déplacé
     readonly HashSet<IntPtr> serieComptee = []; // série de clignotements en cours déjà comptée
     readonly Dictionary<IntPtr, long> dernierSignal = []; // heure du dernier 0x8006 par fenêtre
     readonly HashSet<IntPtr> signales = [];// fenêtres Steam déjà comptées comme « nouveau message », pas encore activées
@@ -309,7 +310,15 @@ sealed class Volet : IDisposable
             // Décalé d'un pixel en haut et à droite : le liseré de Windows autour de la liste reste visible.
             int marge = Math.Max(1, (int)k);
             var rc = new Rectangle(vc.Right - (int)(108 * k) - marge, vc.Top + marge, (int)(108 * k), (int)(36 * k));
-            if (!cacheVisible) cache.Accorder(steam.Contacts, rc, k);
+            // À la première ouverture, Steam n'a pas encore redessiné la liste : la capture est fausse. On la refait
+            // toutes les 250 ms pendant 1,5 s après l'apparition (le cache ne gêne pas : PrintWindow lit la liste seule).
+            if (!cacheVisible) { cacheDepuis = t; prochainAccord = 0; }
+            if (t >= prochainAccord && t - cacheDepuis <= 1500)
+            {
+                cache.Accorder(steam.Contacts, rc, k);
+                cache.Invalidate();
+                prochainAccord = t + 250;
+            }
             if (!cacheVisible || rc != rectCache)
             {
                 Native.Placer(cache.Handle, rc, false);
