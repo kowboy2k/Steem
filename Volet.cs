@@ -559,10 +559,14 @@ sealed class Volet : IDisposable
             if (f.Hwnd == steam.Principale || f.Hwnd == steam.Contacts || f.Proprietaire != IntPtr.Zero || !f.Visible
                 || f.Classe != "SDL_app" || string.IsNullOrWhiteSpace(f.Titre) || f.Titre.Contains("Steam")
                 || reglages.TitresContacts.Contains(f.Titre) || discussions.Contains(f.Hwnd)) continue;
+            // Icône posée AVANT l'identifiant : l'Explorateur prend l'icône du groupe à la création du bouton
+            // (dans l'autre ordre, le bouton gardait le logo Steam après une relance de Steem, 17/11).
+            Groupe.Iconiser(f.Hwnd, icoPetite.Handle, icoGrande.Handle);
             if (Groupe.Definir(f.Hwnd, Groupe.Discussions)) discussions.Add(f.Hwnd);
         }
         // Icône « discussions » (logo Steam + bulle blanche), remise si Steam la change.
-        foreach (var h in discussions) Groupe.Iconiser(h, icoPetite.Handle, icoGrande.Handle);    }
+        foreach (var h in discussions) Groupe.Iconiser(h, icoPetite.Handle, icoGrande.Handle);
+    }
 
     internal void Quitter()
     {

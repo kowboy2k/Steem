@@ -6,7 +6,7 @@ namespace Steem;
 // on leur donne un AppUserModelID à part (propriété de fenêtre, lisible par l'Explorateur), retiré à la sortie.
 static class Groupe
 {
-    public const string Discussions = "Steem.DiscussionsSteam";
+    public const string Discussions = "Steem.ChatsSteam"; // nouvel id le 17/11 : l'Explorateur avait mémorisé le logo Steam pour l'ancien (Steem.DiscussionsSteam)
 
     [ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface IPropertyStore
@@ -32,7 +32,21 @@ static class Groupe
     [DllImport("shell32.dll")] static extern int SHGetPropertyStoreForWindow(IntPtr h, ref Guid iid, [MarshalAs(UnmanagedType.Interface)] out IPropertyStore store);
     [DllImport("ole32.dll")] static extern int PropVariantClear(ref PropVariant v);
 
-    static PropertyKey CleAppId = new() { fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), pid = 5 };
+    static readonly Guid Fmt = new("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");
+    static PropertyKey CleAppId = new() { fmtid = Fmt, pid = 5 };
+    static PropertyKey CleCommande = new() { fmtid = Fmt, pid = 2 }, CleIcone = new() { fmtid = Fmt, pid = 3 }, CleNom = new() { fmtid = Fmt, pid = 4 };
+
+    // Icône du bouton groupé : l'Explorateur la prend dans ce fichier (RelaunchIconResource), pas dans WM_SETICON,
+    // sinon le bouton garde le logo Steam selon l'ordre de création (Kev, 17/11).
+    static readonly string FichierIcone = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Steem", "Discussions.ico");
+
+    static void Ecrire(IPropertyStore store, ref PropertyKey k, string valeur)
+    {
+        var v = new PropVariant();
+        if (valeur != null) { v.vt = 31; v.p = Marshal.StringToCoTaskMemUni(valeur); } // VT_LPWSTR
+        try { store.SetValue(ref k, ref v); }
+        finally { if (valeur != null) PropVariantClear(ref v); }
+    }
 
     // id = null : retire l'identifiant (la fenêtre rejoint de nouveau le bouton de Steam).
     public static bool Definir(IntPtr h, string id)
@@ -42,14 +56,30 @@ static class Groupe
         {
             var iid = typeof(IPropertyStore).GUID;
             if (SHGetPropertyStoreForWindow(h, ref iid, out store) != 0 || store == null) return false;
-            var v = new PropVariant();
-            if (id != null) { v.vt = 31; v.p = Marshal.StringToCoTaskMemUni(id); } // VT_LPWSTR
-            try { store.SetValue(ref CleAppId, ref v); store.Commit(); }
-            finally { if (id != null) PropVariantClear(ref v); }
+            bool icone = id != null && PreparerIcone();
+            Ecrire(store, ref CleCommande, icone ? "explorer.exe steam://open/friends" : null);
+            Ecrire(store, ref CleNom, icone ? "Steam" : null);
+            Ecrire(store, ref CleIcone, icone ? FichierIcone + ",0" : null);
+            Ecrire(store, ref CleAppId, id);
+            store.Commit();
             return true;
         }
         catch { return false; }
         finally { if (store != null) Marshal.ReleaseComObject(store); }
+    }
+
+    static bool PreparerIcone()
+    {
+        try
+        {
+            if (File.Exists(FichierIcone)) return true;
+            Directory.CreateDirectory(Path.GetDirectoryName(FichierIcone));
+            using var s = typeof(Groupe).Assembly.GetManifestResourceStream("Discussions.ico");
+            using var f = File.Create(FichierIcone);
+            s.CopyTo(f);
+            return true;
+        }
+        catch { return false; }
     }
 
     [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint ms, out IntPtr res);
