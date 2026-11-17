@@ -33,6 +33,7 @@ sealed class Volet : IDisposable
     bool pleinEcran; // Steam en plein écran (vidéo) : volet replié, rien n'est déplacé
     readonly HashSet<IntPtr> serieComptee = []; // série de clignotements en cours déjà comptée
     readonly Dictionary<IntPtr, long> dernierSignal = []; // heure du dernier 0x8006 par fenêtre
+    long dernierClicListe, conversationA; IntPtr conversation; // clic dans la liste, puis fenêtre de discussion qui s'ouvre
     readonly HashSet<IntPtr> signales = [];// fenêtres Steam déjà comptées comme « nouveau message », pas encore activées
 
     // Trace des clignotements reçus (%APPDATA%\Steem\messages.log, 100 Ko au plus) pour vérifier les faux positifs.
@@ -59,6 +60,9 @@ sealed class Volet : IDisposable
         {
             // Fenêtre activée : son bouton de barre des tâches n'est plus orange, un prochain clignotement compte de nouveau.
             if (code is 4 or 0x8004) signales.Remove(h);
+            // Fenêtre de discussion créée, redessinée ou qui clignote (pas Steam ni la liste) : retenue pour le repli d'après clic.
+            if (code is 1 or 6 or 0x8006 && h != steam.Principale && h != steam.Contacts && steam.EstSteam(h))
+            { conversationA = Environment.TickCount64; conversation = h; }
             if (code == 0x8006 && h != steam.Principale && steam.EstSteam(h))
             {
                 // 0x8006 (HSHELL_FLASH) revient aussi quand une fenêtre DÉJÀ signalée (bouton resté orange) est
@@ -236,6 +240,17 @@ sealed class Volet : IDisposable
         signales.Remove(premier);
         // Un clic dans la liste activée par nous : elle devient la fenêtre de travail, plus de repli au départ de la souris.
         if (activeParNous && bouton && !boutonAvant && tiroir.Contains(souris)) activeParNous = false;
+        if (deplie && bouton && !boutonAvant && tiroir.Contains(souris)) dernierClicListe = t;
+        // Conversation ouverte depuis la liste sans que Steam lui donne le focus : la liste le gardait et restait
+        // dépliée jusqu'à un clic dans Steam (Kev, 17/11). Une fois la souris sortie, on replie et on active la discussion.
+        if (premier == steam.Contacts && !reglages.Epingle && !ouvertManuel && dernierClicListe > 0
+            && conversationA >= dernierClicListe && conversationA - dernierClicListe < 3000
+            && !surTiroir && !surPoignee && t - derniereDedans >= reglages.DelaiRepliMs)
+        {
+            dernierClicListe = 0; derniereDedans = 0; retenuJusqua = 0;
+            fermeForcee = true;
+            if (Native.IsWindow(conversation) && Native.IsWindowVisible(conversation)) { Native.Activer(conversation); premier = conversation; }
+        }
 
         bool parSurvol = surBord && t - survolDebut >= reglages.DelaiSurvolMs;
         bool voulu = reglages.Epingle
