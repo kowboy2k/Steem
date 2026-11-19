@@ -22,6 +22,8 @@ sealed class Reglages
     public float OmbreDx { get; set; } = 2;
     public float OmbreDy { get; set; } = 1.5f;
     public int OmbreOpacite { get; set; } = 6;      // alpha de chaque couche (0-255)
+    public string Ludusavi { get; set; } = "";              // ludusavi.exe (vide : à côté de Steem, puis le PATH)
+    public string DossierSauvegardes { get; set; } = "";    // vide : Documents\Steem\Sauvegardes
     public string[] TitresContacts { get; set; } =
         ["Liste de contacts", "Friends List", "Freundesliste", "Lista de amigos"];
 

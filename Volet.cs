@@ -22,6 +22,7 @@ sealed class Volet : IDisposable
     readonly BarreDesTaches barre = new();
     bool deplie, gere, boutonAvant, poigneeVisible, cacheVisible, fermeForcee, horsBarre, nonLu, cote, ouvertManuel, activeParNous;
     IntPtr avantActivation;
+    InterfaceSteam interfaceSteam;
     long pauseJusqua;
     Rectangle rectCache;
     long survolDebut, derniereDedans, retenuJusqua, prochainRetrait;
@@ -96,6 +97,7 @@ sealed class Volet : IDisposable
 
         minuterie.Tick += (_, _) => Tic();
         minuterie.Start();
+        interfaceSteam = new InterfaceSteam(reglages); // bouton « Désinstaller » dans la page des jeux (0.13.0)
 
         // Steam déplacé ou redimensionné : on suit aussitôt, sans attendre le prochain tour de 40 ms
         // (sinon la languette traîne derrière le bord de Steam).
@@ -579,6 +581,7 @@ sealed class Volet : IDisposable
     internal void Quitter()
     {
         minuterie.Stop();
+        interfaceSteam?.Dispose();
         if (crochetPosition != IntPtr.Zero) Native.UnhookWinEvent(crochetPosition);
         Restaurer();
         Application.ExitThread();
