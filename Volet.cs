@@ -560,15 +560,11 @@ sealed class Volet : IDisposable
     {
         if (!reglages.RegrouperChats) return;
         discussions.RemoveWhere(h => !Native.IsWindow(h));
-        // Fenêtre de promo (« Offres spéciales »…) regroupée par erreur : elle rejoint Steam (19/11).
-        foreach (var h in discussions.Where(h => !Native.Redimensionnable(h)).ToList())
-        { Groupe.Definir(h, null); Groupe.RendreIcone(h); discussions.Remove(h); }
+        // Les fenêtres de promo (« Offres spéciales »…) vont aussi sous l'icône des messages (Kev, 19/11 22:03).
         foreach (var f in steam.Lister())
         {
             if (f.Hwnd == steam.Principale || f.Hwnd == steam.Contacts || f.Proprietaire != IntPtr.Zero || !f.Visible
-                || f.Classe != "SDL_app" || string.IsNullOrWhiteSpace(f.Titre) || f.Titre.Contains("Steam")
-                || !Native.Redimensionnable(f.Hwnd)
-                || reglages.TitresContacts.Contains(f.Titre) || discussions.Contains(f.Hwnd)) continue;
+                || f.Classe != "SDL_app" || string.IsNullOrWhiteSpace(f.Titre) || f.Titre.Contains("Steam")                || reglages.TitresContacts.Contains(f.Titre) || discussions.Contains(f.Hwnd)) continue;
             // Icône posée AVANT l'identifiant : l'Explorateur prend l'icône du groupe à la création du bouton
             // (dans l'autre ordre, le bouton gardait le logo Steam après une relance de Steem, 17/11).
             Groupe.Iconiser(f.Hwnd, icoPetite.Handle, icoGrande.Handle);
