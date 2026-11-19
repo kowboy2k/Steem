@@ -172,11 +172,15 @@ sealed class Volet : IDisposable
             pauseJusqua = t + 250;
             return;
         }
-        if (listeReduite)
+        // Steam affiché : la liste réduite (avec lui, ou par Steam à son redémarrage) revient, sans prendre le focus.
+        // Avant le 19/11, le test passait par contactsOk, toujours faux pour une liste réduite : elle restait réduite,
+        // avec son propre bouton dans la barre des tâches.
+        bool listeIconique = steam.Contacts != IntPtr.Zero && Native.IsWindow(steam.Contacts)
+            && Native.IsWindowVisible(steam.Contacts) && Native.IsIconic(steam.Contacts);
+        if (listeReduite || listeIconique)
         {
-            // Steam revenu : la liste réduite avec lui revient, sans prendre le focus.
             listeReduite = false;
-            if (contactsOk && Native.IsIconic(steam.Contacts)) Native.ShowWindowAsync(steam.Contacts, 4); // SW_SHOWNOACTIVATE
+            if (listeIconique) Native.ShowWindowAsync(steam.Contacts, 4); // SW_SHOWNOACTIVATE
             derniereCible = Rectangle.Empty;
         }
 
@@ -554,10 +558,14 @@ sealed class Volet : IDisposable
     {
         if (!reglages.RegrouperChats) return;
         discussions.RemoveWhere(h => !Native.IsWindow(h));
+        // Fenêtre de promo (« Offres spéciales »…) regroupée par erreur : elle rejoint Steam (19/11).
+        foreach (var h in discussions.Where(h => !Native.Redimensionnable(h)).ToList())
+        { Groupe.Definir(h, null); Groupe.RendreIcone(h); discussions.Remove(h); }
         foreach (var f in steam.Lister())
         {
             if (f.Hwnd == steam.Principale || f.Hwnd == steam.Contacts || f.Proprietaire != IntPtr.Zero || !f.Visible
                 || f.Classe != "SDL_app" || string.IsNullOrWhiteSpace(f.Titre) || f.Titre.Contains("Steam")
+                || !Native.Redimensionnable(f.Hwnd)
                 || reglages.TitresContacts.Contains(f.Titre) || discussions.Contains(f.Hwnd)) continue;
             // Icône posée AVANT l'identifiant : l'Explorateur prend l'icône du groupe à la création du bouton
             // (dans l'autre ordre, le bouton gardait le logo Steam après une relance de Steem, 17/11).

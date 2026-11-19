@@ -159,6 +159,8 @@ static class Native
     public static float Echelle(IntPtr h) { var d = GetDpiForWindow(h); return d == 0 ? 1f : d / 96f; }
 
     static bool Topmost(IntPtr h) => (GetWindowLong(h, -20) & 0x8) != 0;
+    // Bord redimensionnable (WS_THICKFRAME) : les discussions l'ont, pas les fenêtres de promo de Steam (19/11).
+    public static bool Redimensionnable(IntPtr h) => (GetWindowLong(h, -16) & 0x40000) != 0;
 
     // Fenêtres étrangères : appel asynchrone pour ne jamais rester bloqué si Steam ne répond plus.
     public static void Placer(IntPtr h, Rectangle r, bool etrangere) =>
