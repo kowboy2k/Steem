@@ -44,6 +44,9 @@ Source: "publication-leger\Steem.exe"; DestDir: "{app}"; Flags: ignoreversion
 #else
 Source: "publication\Steem.exe"; DestDir: "{app}"; Flags: ignoreversion
 #endif
+; Ludusavi (MIT, github.com/mtkennerly/ludusavi) : sauvegarde et restauration des fichiers des jeux.
+Source: "ludusavi\ludusavi.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "ludusavi\LICENSE.txt"; DestDir: "{app}"; DestName: "ludusavi-LICENSE.txt"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Steem"; Filename: "{app}\Steem.exe"

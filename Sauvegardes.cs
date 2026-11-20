@@ -53,7 +53,7 @@ static class Ludusavi
         if (connu != null) return new Jeu(connu, null);
         if (string.IsNullOrWhiteSpace(nomSteam)) return null;
 
-        // Jeu absent du manifeste (Oblivity, 20/11) : déjà déclaré par Steem, sinon recherche de ses dossiers.
+        // Jeu absent du manifeste (20/11) : déjà déclaré par Steem, sinon recherche de ses dossiers.
         var config = JsonNode.Parse(await Lancer(exe, "config", "show", "--api"))!.AsObject();
         if (config["customGames"] is not JsonArray perso) config["customGames"] = perso = new JsonArray();
         var deja = perso.FirstOrDefault(g => (string)g?["name"] == nomSteam);

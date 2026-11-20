@@ -52,18 +52,37 @@
   ];
   const CLASSE = 'steem-bouton';
 
+  // Infobulle de Steem (0.15.6) : celle de Steam (attribut title) coupait le texte dans un cadre trop petit.
+  const BULLE = 'steem-bulle';
+  const cacherBulle = doc => { const x = doc.getElementById(BULLE); if (x) x.remove(); };
+  const bulle = (doc, b) => {
+    cacherBulle(doc);
+    const x = doc.createElement('div');
+    x.id = BULLE;
+    x.textContent = b.dataset.info || '';
+    x.style.cssText = 'position:fixed;z-index:100000;pointer-events:none;white-space:pre;max-width:none;'
+      + 'background:#3d4450;color:#dcdedf;font-size:12px;line-height:1.5;padding:6px 10px;border-radius:3px;'
+      + 'box-shadow:0 2px 8px rgba(0,0,0,.6)';
+    doc.body.appendChild(x);
+    const r = b.getBoundingClientRect(), w = x.offsetWidth, h = x.offsetHeight, vw = doc.documentElement.clientWidth;
+    x.style.left = Math.max(4, Math.min(r.right - w, vw - w - 4)) + 'px';
+    x.style.top = (r.bottom + h + 8 > doc.documentElement.clientHeight ? r.top - h - 6 : r.bottom + 6) + 'px';
+  };
+
   const creer = (doc, appid, d) => {
     const b = doc.createElement('div');
     b.className = CLASSE + ' steem-' + d.sorte + ' ' + classes.MenuButton;
     b.dataset.appid = String(appid);
     b.dataset.v = VERSION;   // boutons d'une version précédente de Steem : refaits
-    b.title = d.titre;
+    b.dataset.info = d.titre;
+    b.addEventListener('mouseenter', () => bulle(doc, b));
+    b.addEventListener('mouseleave', () => cacherBulle(doc));
     b.setAttribute('role', 'button');
     b.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;'
       + (d.texte || d.led ? 'width:auto;padding:0 12px;font-size:13px;font-weight:400;white-space:nowrap' : '');
     b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex:none">' + d.icone + '</svg>'
       + (d.texte ? '<span>' + d.texte + '</span>' : '')
-      + (d.led ? '<span class="steem-date"></span><span class="steem-led" style="flex:none;width:8px;height:8px;border-radius:50%"></span>' : '');
+      + (d.led ? '<span class="steem-date" style="font-size:11px"></span><span class="steem-led" style="flex:none;width:8px;height:8px;border-radius:50%"></span>' : '');
     b.addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();
       const ov = appStore.GetAppOverviewByAppID(appid);
@@ -89,7 +108,7 @@
     l.style.background = couleur;
     l.style.boxShadow = t ? '0 0 6px ' + couleur : 'none';
     d.textContent = t ? date(t) : 'Aucune';
-    b.title = 'Sauvegarder ou restaurer les fichiers du jeu (Steem)\n'
+    b.dataset.info = 'Sauvegarder ou restaurer les fichiers du jeu (Steem)\n'
       + 'Dernière sauvegarde : ' + (t ? date(t) + ' ' + heure(t) : 'aucune') + '\n'
       +'Dernier lancement : ' + (lance ? date(lance) + ' ' + heure(lance) : 'jamais');
   };
@@ -101,6 +120,7 @@
       const popup = g_PopupManager.GetExistingPopup('SP Desktop_uid0');
       const doc = popup && popup.m_popup && popup.m_popup.document;
       if (!doc) return;
+      if (doc.getElementById(BULLE) && !doc.querySelector('.' + CLASSE + ':hover')) cacherBulle(doc);  // bouton retiré sous la souris
       const chemin = (MainWindowBrowserManager.m_lastLocation || {}).pathname || '';
       const m = /^\/library\/app\/(\d+)/.exec(chemin);
       const appid = m ? Number(m[1]) : 0;

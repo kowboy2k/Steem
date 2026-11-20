@@ -8,10 +8,13 @@ Steam a enfin le droit à **une fenêtre inifiée.**
 - 📌 Approche du bord droit : le volet s'ouvre. Un clic : c'est épinglé, Steam s'arrange.
 - 💬 Nouveau message : le volet s'ouvre et la discussion a sa propre icône séparée.
 - 🟦 Ton statut Steam d'un simple coup d'œil.
+- 🗑️ Sur la page d'un jeu : « Désinstaller » propose d'abord de sauvegarder ses fichiers (parties, configs, binds).
+- 💾 La disquette sauvegarde ou restaure ces fichiers ; sa pastille dit si la sauvegarde est à jour.
 - ⚙️ Réglages dans l'icône près de l'horloge.
 
-**Installer :** [Releases](../../releases) → `Steem_Setup_….exe` (complet, ~65 Mo) ou `…_leger.exe` (~2 Mo, .NET 8 requis).
+**Installer :** [Releases](../../releases) → `Steem_Setup_….exe` (complet, ~72 Mo) ou `…_leger.exe` (~11 Mo, .NET 8 requis).
 Windows avertit (non signé) : « Informations complémentaires » › « Exécuter quand même ».
+Boutons dans Steam : créer un fichier vide `.cef-enable-remote-debugging` dans le dossier de Steam, puis relancer Steam. Sauvegardes par [Ludusavi](https://github.com/mtkennerly/ludusavi) (MIT), inclus.
 
 ---
 
@@ -34,10 +37,13 @@ Steem docks it to Steam's right edge: **all in one window.**
 - 📌 Approch the right edge : the panel opens. One click : pinned, Steam makes room.
 - 💬 New message: the panel opens, the chat windows gets their own buttons in taskbar.
 - 🟦 Your Steam status at a glance.
+- 🗑️ On a game's page: "Uninstall" first offers to back up its files (saves, configs, binds).
+- 💾 The floppy button backs up or restores those files; its dot shows whether the backup is up to date.
 - ⚙️ Settings in the tray icon (interface in French for now).
 
-**Install:** [Releases](../../releases) → `Steem_Setup_….exe` (full, ~65 MB) or `…_leger.exe` (~2 MB, needs .NET 8).
+**Install:** [Releases](../../releases) → `Steem_Setup_….exe` (full, ~72 MB) or `…_leger.exe` (~11 MB, needs .NET 8).
 Windows warns (unsigned): "More info" › "Run anyway".
+Buttons inside Steam: create an empty `.cef-enable-remote-debugging` file in Steam's folder, then restart Steam. Backups by [Ludusavi](https://github.com/mtkennerly/ludusavi) (MIT), included.
 
 ---
 
@@ -49,10 +55,13 @@ Steem dockt sie an den rechten Rand von Steam: **ein Fenster.**
 - 📌 Rechter Rand: die Leiste öffnet sich. Ein Klick: angeheftet, Steam macht Platz.
 - 💬 Neue Nachricht: die Leiste öffnet sich, der Chat bekommt sein eigenes Symbol.
 - 🟦 Dein Steam-Status auf einen Blick.
+- 🗑️ Auf der Spielseite: „Deinstallieren“ bietet zuerst an, die Spieldateien zu sichern (Spielstände, Configs, Binds).
+- 💾 Die Diskette sichert oder stellt diese Dateien wieder her; ihr Punkt zeigt, ob die Sicherung aktuell ist.
 - ⚙️ Einstellungen im Symbol neben der Uhr (Oberfläche vorerst auf Französisch).
 
-**Installieren:** [Releases](../../releases) → `Steem_Setup_….exe` (komplett, ~65 MB) oder `…_leger.exe` (~2 MB, .NET 8 nötig).
+**Installieren:** [Releases](../../releases) → `Steem_Setup_….exe` (komplett, ~72 MB) oder `…_leger.exe` (~11 MB, .NET 8 nötig).
 Windows warnt (nicht signiert): „Weitere Informationen“ › „Trotzdem ausführen“.
+Knöpfe in Steam: eine leere Datei `.cef-enable-remote-debugging` im Steam-Ordner anlegen, dann Steam neu starten. Sicherungen mit [Ludusavi](https://github.com/mtkennerly/ludusavi) (MIT), enthalten.
 
 ---
 

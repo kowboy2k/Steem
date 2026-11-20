@@ -10,6 +10,14 @@ $version = $csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-
 $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
 $commun = '-p:PublishSingleFile=true', '-c', 'Release', '-r', 'win-x64', '--ignore-failed-sources'
 
+# Ludusavi (bouton Désinstaller et disquette) : ludusavi.exe livré à côté de Steem. Pris dans $env:LUDUSAVI,
+# sinon dans Ressources\Apps\Ludusavi deux dossiers au-dessus du projet, sinon dans le PATH.
+$ludusavi = @($env:LUDUSAVI, (Join-Path $projet '..\..\Ressources\Apps\Ludusavi\ludusavi.exe'),
+              (Get-Command ludusavi.exe -ErrorAction SilentlyContinue).Source) |
+            Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if (-not $ludusavi) { throw "ludusavi.exe introuvable (variable LUDUSAVI)" }
+Copy-Item $ludusavi (Join-Path $ici 'ludusavi\ludusavi.exe') -Force
+
 dotnet publish $csprojChemin @commun --self-contained true -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:EnableCompressionInSingleFile=true -o (Join-Path $ici 'publication')
 if ($LASTEXITCODE) { throw "dotnet publish (complet) a échoué" }
