@@ -34,15 +34,16 @@
       const m = /^\/library\/app\/(\d+)/.exec(chemin);
       const appid = m ? Number(m[1]) : 0;
       const o = appid ? appStore.GetAppOverviewByAppID(appid) : null;
-      const barre = doc.querySelector('.' + classes.AppButtonsContainer);
-      let b = doc.getElementById(ID);
-      if (!barre || !o || !o.installed) { if (b) b.remove(); return; }
-      if (b && (b.parentElement !== barre || b.dataset.appid !== String(appid))) { b.remove(); b = null; }
-      if (b) return;
-      b = doc.createElement('div');
-      b.id = ID;
+      // Deux barres sur la page : l'en-tête compact (affiché au défilement) et la barre sous l'image : un bouton dans chacune (20/11).
+      const barres = o && o.installed ? Array.from(doc.querySelectorAll('.' + classes.AppButtonsContainer)) : [];
+      const ancien = doc.getElementById(ID); if (ancien) ancien.remove();   // bouton unique de la 0.13.1
+      for (const x of doc.querySelectorAll('.' + ID))
+        if (!barres.includes(x.parentElement) || x.dataset.appid !== String(appid)) x.remove();
+      for (const barre of barres) {
+      if (barre.querySelector(':scope > .' + ID)) continue;
+      const b = doc.createElement('div');
+      b.className = ID + ' ' + classes.MenuButton;
       b.dataset.appid = String(appid);
-      b.className = classes.MenuButton;
       b.title = 'Désinstaller (Steem propose d\'abord une sauvegarde)';
       b.setAttribute('role', 'button');
       b.style.cssText = 'display:flex;align-items:center;gap:8px;width:auto;padding:0 14px;cursor:pointer;'
@@ -54,6 +55,7 @@
         window.steemAppel(JSON.stringify({ action: 'desinstaller', appid, nom: ov ? ov.display_name : '' }));
       });
       barre.insertBefore(b, barre.firstChild);
+      }
     } catch (e) { /* Steam en cours de chargement : prochain tour */ }
   };
 
