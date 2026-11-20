@@ -19,11 +19,35 @@
     return null;
   };
 
+  // Fenêtre de confirmation de désinstallation de Steam (ShowUninstallDialog), retrouvée par son message d'erreur interne.
+  // SteamClient.Installs.OpenUninstallWizard, lui, désinstalle SANS confirmation (Steam l'appelle après le « OK ») : jamais direct.
+  const desinstaller = appid => {
+    let req;
+    window.webpackChunksteamui.push([[Symbol()], {}, r => { req = r; }]);
+    for (const id of Object.keys(req.m)) {
+      const src = String(req.m[id]);
+      if (src.indexOf('RemoteClientID to ShowUninstallDialog') < 0) continue;
+      const m = req(id);
+      const k = Object.keys(m).find(k => typeof m[k] === 'function' && String(m[k]).indexOf('ShowUninstallDialog') >= 0);
+      if (!k) break;
+      let client = '0';   // ce PC
+      try {
+        const x = /(\w+)\.(\w+),"Sent in invalid RemoteClientID/.exec(String(m[k]));
+        const y = new RegExp('[,{ ]' + x[1] + '=\\w\\((\\d+)\\)').exec(src);
+        client = req(y[1])[x[2]] ?? '0';
+      } catch { }
+      const fenetre = g_PopupManager.GetExistingPopup('SP Desktop_uid0').m_popup;
+      m[k]([appid], fenetre, false, client);
+      return 'ok';
+    }
+    return 'introuvable';
+  };
+
   // Boutons de Steem, dans l'ordre : « Désinstaller » puis la disquette (sauvegarder / restaurer, 0.14.0).
   const BOUTONS = [
     { sorte: 'desinstaller', texte: 'Désinstaller', titre: 'Désinstaller (Steem propose d\'abord une sauvegarde)',
       icone: '<path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-3 6h12l-1 12H7L6 9zm4 2v8h1.5v-8H10zm3.5 0v8H15v-8h-1.5z"/>' },
-    { sorte: 'sauvegardes', texte: '', titre: 'Sauvegarder ou restaurer les fichiers du jeu (Steem)',
+    { sorte: 'sauvegardes', texte: '', titre: 'Sauvegarder ou restaurer les fichiers du jeu (Steem)', led: true,
       icone: '<path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z"/>' },
   ];
   const CLASSE = 'steem-bouton';
@@ -32,18 +56,42 @@
     const b = doc.createElement('div');
     b.className = CLASSE + ' steem-' + d.sorte + ' ' + classes.MenuButton;
     b.dataset.appid = String(appid);
+    b.dataset.v = VERSION;   // boutons d'une version précédente de Steem : refaits
     b.title = d.titre;
     b.setAttribute('role', 'button');
     b.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;'
-      + (d.texte ? 'width:auto;padding:0 14px;font-size:13px;font-weight:500;letter-spacing:.3px;white-space:nowrap' : '');
+      + (d.texte || d.led ? 'width:auto;padding:0 12px;font-size:13px;font-weight:400;white-space:nowrap' : '');
     b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex:none">' + d.icone + '</svg>'
-      + (d.texte ? '<span>' + d.texte + '</span>' : '');
+      + (d.texte ? '<span>' + d.texte + '</span>' : '')
+      + (d.led ? '<span class="steem-date"></span><span class="steem-led" style="flex:none;width:8px;height:8px;border-radius:50%"></span>' : '');
     b.addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();
       const ov = appStore.GetAppOverviewByAppID(appid);
       window.steemAppel(JSON.stringify({ action: d.sorte, appid, nom: ov ? ov.display_name : '' }));
     });
     return b;
+  };
+
+  // LED de la disquette (0.15.0) : grise = jamais sauvegardé ; verte = sauvegarde du jour du dernier lancement
+  // ou plus récente ; rouge = sauvegarde plus ancienne que le dernier lancement. Dates poussées par Steem (window.__steemSauv).
+  const jour = t => { const d = new Date(t * 1000); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const date = t => new Date(t * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const heure = t => new Date(t * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const led = (b, appid, o) => {
+    const t = (window.__steemSauv || {})[appid] || 0;
+    const lance = o.rt_last_time_played || 0;
+    const etat = t + '|' + lance;
+    if (b.dataset.etat === etat) return;
+    b.dataset.etat = etat;
+    const l = b.querySelector('.steem-led'), d = b.querySelector('.steem-date');
+    if (!l || !d) return;
+    const couleur = !t ? '#5c6670' : (!lance || jour(t) >= jour(lance)) ? '#4cd137' : '#e5483f';
+    l.style.background = couleur;
+    l.style.boxShadow = t ? '0 0 6px ' + couleur : 'none';
+    d.textContent = t ? date(t) : 'Aucune';
+    b.title = 'Sauvegarder ou restaurer les fichiers du jeu (Steem)\n'
+      + 'Dernière sauvegarde : ' + (t ? date(t) + ' ' + heure(t) : 'aucune') + '\n'
+      +'Dernier lancement : ' + (lance ? date(lance) + ' ' + heure(lance) : 'jamais');
   };
 
   const cycle = () => {
@@ -61,17 +109,18 @@
       const barres = o && o.installed ? Array.from(doc.querySelectorAll('.' + classes.AppButtonsContainer)) : [];
       for (const x of doc.querySelectorAll('#steem-desinstaller, .steem-desinstaller:not(.' + CLASSE + ')')) x.remove(); // 0.13.x
       for (const x of doc.querySelectorAll('.' + CLASSE))
-        if (!barres.includes(x.parentElement) || x.dataset.appid !== String(appid)) x.remove();
+        if (!barres.includes(x.parentElement) || x.dataset.appid !== String(appid) || x.dataset.v !== VERSION) x.remove();
       for (const barre of barres) {
         if (barre.querySelectorAll(':scope > .' + CLASSE).length === BOUTONS.length) continue;
         for (const x of barre.querySelectorAll(':scope > .' + CLASSE)) x.remove();
         const debut = barre.firstChild;
         for (const d of BOUTONS) barre.insertBefore(creer(doc, appid, d), debut);
       }
+      for (const b of doc.querySelectorAll('.steem-sauvegardes.' + CLASSE)) led(b, appid, o);
     } catch (e) { /* Steam en cours de chargement : prochain tour */ }
   };
 
-  window.__steem = { version: VERSION, boucle: setInterval(cycle, 400) };
+  window.__steem = { version: VERSION, boucle: setInterval(cycle, 400), desinstaller };
   cycle();
   return 'injecte';
 })()

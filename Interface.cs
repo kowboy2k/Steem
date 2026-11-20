@@ -50,11 +50,12 @@ sealed class InterfaceSteam : IDisposable
                 await Envoyer("Runtime.enable", null);
                 await Envoyer("Runtime.addBinding", new JsonObject { ["name"] = "steemAppel" });
                 await Injecter();
+                await PublierSauvegardes();
                 var garde = Task.Run(async () =>
                 {
                     // Steam recharge parfois son interface : le script vérifie sa version et se remet en place.
                     while (ws.State == WebSocketState.Open && !fin.IsCancellationRequested)
-                    { await Task.Delay(5000, fin.Token); await Injecter(); }
+                    { await Task.Delay(5000, fin.Token); await Injecter(); await PublierSauvegardes(); }
                 });
                 await Ecouter();
             }
@@ -67,6 +68,15 @@ sealed class InterfaceSteam : IDisposable
     }
 
     Task Injecter() => Envoyer("Runtime.evaluate", new JsonObject { ["expression"] = script });
+
+    // Dates des dernières sauvegardes, lues par la disquette de la page du jeu (LED, 0.15.0).
+    public async Task PublierSauvegardes()
+    {
+        var d = await Task.Run(() => Ludusavi.Dernieres(reglages));
+        var o = new JsonObject();
+        foreach (var (appid, t) in d) o[appid.ToString()] = t;
+        await Evaluer("window.__steemSauv = " + o.ToJsonString());
+    }
 
     public Task Evaluer(string expression) => Envoyer("Runtime.evaluate", new JsonObject { ["expression"] = expression });
 
@@ -106,7 +116,7 @@ sealed class InterfaceSteam : IDisposable
                 int appid = (int)appel["appid"];
                 string nom = (string)appel["nom"] ?? "";
                 if (action == "desinstaller") ui.Post(_ => Ouvrir(() => new FenetreDesinstaller(this, reglages, appid, nom)), null);
-                else if (action == "sauvegardes") ui.Post(_ => Ouvrir(() => new FenetreSauvegardes(reglages, appid, nom)), null);
+                else if (action == "sauvegardes") ui.Post(_ => Ouvrir(() => new FenetreSauvegardes(this, reglages, appid, nom)), null);
             }
             catch { }
         }
@@ -121,9 +131,10 @@ sealed class InterfaceSteam : IDisposable
         fenetre.Activate();
     }
 
-    // Assistant de désinstallation de Steam (il garde sa propre confirmation).
+    // Fenêtre de confirmation de désinstallation de Steam (Interface.js : ShowUninstallDialog).
+    // Jamais SteamClient.Installs.OpenUninstallWizard en direct : il désinstalle sans confirmation.
     public Task OuvrirDesinstallation(int appid) =>
-        Evaluer($"SteamClient.Installs.OpenUninstallWizard([{appid}], false)");
+        Evaluer($"window.__steem && window.__steem.desinstaller({appid})");
 
     public void Dispose()
     {
@@ -138,12 +149,13 @@ sealed class FenetreDesinstaller : FenetreSombre
     readonly InterfaceSteam steam;
     readonly Reglages reglages;
     readonly int appid;
+    readonly string nom;
     readonly Label etat;
     readonly Button sauver, direct, annuler;
 
     public FenetreDesinstaller(InterfaceSteam s, Reglages r, int appid, string nom) : base("Steem — Désinstaller")
     {
-        steam = s; reglages = r; this.appid = appid;
+        steam = s; reglages = r; this.appid = appid; this.nom = nom;
         Titre($"Désinstaller « {nom} »");
         Paragraphe("Sauvegarder d'abord le profil du jeu (sauvegardes, configs, binds) ?", Texte);
         etat = Paragraphe("", Pale, 44);
@@ -179,11 +191,12 @@ sealed class FenetreDesinstaller : FenetreSombre
         etat.Text = "Recherche des fichiers du jeu…";
         try
         {
-            var jeu = await Ludusavi.TrouverJeu(exe, appid);
-            if (jeu == null) { Echec("Ludusavi ne connaît pas les fichiers de ce jeu : rien n'a été sauvegardé."); return; }
+            var j = await Ludusavi.TrouverJeu(exe, appid, nom);
+            if (j == null) { Echec("Fichiers du jeu introuvables (absent de la base de Ludusavi et des dossiers habituels) : rien n'a été sauvegardé."); return; }
+            var jeu = j.Nom;
             var dossier = Ludusavi.NouveauProfil(Ludusavi.DossierJeu(reglages, jeu), " (avant désinstallation)");
             etat.Text = "Sauvegarde en cours…";
-            var r = await Ludusavi.Sauvegarder(exe, jeu, dossier);
+            var r = await Ludusavi.Sauvegarder(exe, jeu, dossier, appid);
             if (r.Fichiers == 0) { try { Directory.Delete(dossier, true); } catch { } Echec("Aucun fichier trouvé pour ce jeu : rien n'a été sauvegardé."); return; }
             if (r.Erreur != null) { Echec("La sauvegarde a rencontré une erreur, voir le dossier : " + dossier); return; }
             etat.ForeColor = Texte;
@@ -196,6 +209,7 @@ sealed class FenetreDesinstaller : FenetreSombre
 
     async Task Finir()
     {
+        _ = steam.PublierSauvegardes();
         await steam.OuvrirDesinstallation(appid);
         Close();
     }

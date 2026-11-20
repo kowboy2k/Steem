@@ -21,6 +21,10 @@ static class Ludusavi
         return null;
     }
 
+    // Réglages propres à Steem (0.15.2) : les jeux ajoutés par Steem n'encombrent pas le Ludusavi de l'utilisateur.
+    static string DossierConfig => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Steem", "Ludusavi");
+
     static async Task<string> Lancer(string exe, params string[] args)
     {
         var psi = new ProcessStartInfo(exe)
@@ -28,6 +32,8 @@ static class Ludusavi
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8,
         };
+        psi.ArgumentList.Add("--config"); psi.ArgumentList.Add(DossierConfig);
+        psi.ArgumentList.Add("--try-manifest-update");
         foreach (var a in args) psi.ArgumentList.Add(a);
         using var p = Process.Start(psi)!;
         var sortie = p.StandardOutput.ReadToEndAsync();
@@ -36,20 +42,111 @@ static class Ludusavi
         return await sortie;
     }
 
-    // Nom du jeu dans le manifeste de Ludusavi (null : jeu inconnu).
-    public static async Task<string> TrouverJeu(string exe, int appid)
+    // Jeu pour Ludusavi : Nom = son nom ; Dossiers = null s'il est dans le manifeste de Ludusavi, sinon les dossiers
+    // trouvés par Steem et déclarés comme jeu personnalisé. null : rien de connu ni trouvé.
+    public sealed record Jeu(string Nom, string[] Dossiers);
+
+    public static async Task<Jeu> TrouverJeu(string exe, int appid, string nomSteam)
     {
         var r = JsonNode.Parse(await Lancer(exe, "find", "--steam-id", appid.ToString(), "--api"));
-        return r?["games"]?.AsObject().Select(p => p.Key).FirstOrDefault();
+        var connu = r?["games"]?.AsObject().Select(p => p.Key).FirstOrDefault();
+        if (connu != null) return new Jeu(connu, null);
+        if (string.IsNullOrWhiteSpace(nomSteam)) return null;
+
+        // Jeu absent du manifeste (Oblivity, 20/11) : déjà déclaré par Steem, sinon recherche de ses dossiers.
+        var config = JsonNode.Parse(await Lancer(exe, "config", "show", "--api"))!.AsObject();
+        if (config["customGames"] is not JsonArray perso) config["customGames"] = perso = new JsonArray();
+        var deja = perso.FirstOrDefault(g => (string)g?["name"] == nomSteam);
+        if (deja != null) return new Jeu(nomSteam, deja["files"]?.AsArray().Select(f => (string)f).ToArray() ?? []);
+        var dossiers = Chercher(nomSteam, appid);
+        if (dossiers.Count == 0) return null;
+        perso.Add(new JsonObject
+        {
+            ["name"] = nomSteam, ["integration"] = "override",
+            ["files"] = new JsonArray(dossiers.Select(d => (JsonNode)d).ToArray()),
+            ["registry"] = new JsonArray(), ["installDir"] = new JsonArray(), ["winePrefix"] = new JsonArray(),
+        });
+        // Le JSON est du YAML valide : Ludusavi le relit tel quel.
+        Directory.CreateDirectory(DossierConfig);
+        File.WriteAllText(Path.Combine(DossierConfig, "config.yaml"),
+            config.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
+        return new Jeu(nomSteam, dossiers.ToArray());
     }
+
+    static string Cle(string s) => new(s.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+
+    // Dossiers portant le nom du jeu (1 ou 2 niveaux) là où les jeux rangent leurs fichiers, plus son dossier Steam Cloud.
+    static List<string> Chercher(string nom, int appid)
+    {
+        var res = new List<string>();
+        var cle = Cle(nom);
+        if (cle.Length < 4) return res;   // nom trop court : trop de faux positifs
+        var profil = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        string[] racines =
+        [
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Path.Combine(profil, "AppData", "LocalLow"),
+            documents, Path.Combine(documents, "My Games"), Path.Combine(profil, "Saved Games"),
+        ];
+        string[] exclus = ["Temp", "Steem", "Packages", "Microsoft", "Google", "Steam"];
+        foreach (var racine in racines)
+        {
+            if (!Directory.Exists(racine)) continue;
+            IEnumerable<DirectoryInfo> n1;
+            try { n1 = new DirectoryInfo(racine).GetDirectories(); } catch { continue; }
+            foreach (var d1 in n1)
+            {
+                if (exclus.Contains(d1.Name, StringComparer.OrdinalIgnoreCase)) continue;
+                if (Cle(d1.Name) == cle) { res.Add(d1.FullName); continue; }
+                try { foreach (var d2 in d1.GetDirectories()) if (Cle(d2.Name) == cle) res.Add(d2.FullName); } catch { }
+            }
+        }
+        var steam = Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) as string;
+        if (steam != null && Directory.Exists(Path.Combine(steam, "userdata")))
+            foreach (var u in Directory.GetDirectories(Path.Combine(steam, "userdata")))
+            {
+                var distant = Path.Combine(u, appid.ToString(), "remote");
+                if (Directory.Exists(distant)) res.Add(distant);
+            }
+        return res.Distinct(StringComparer.OrdinalIgnoreCase).Select(d => Path.GetFullPath(d).Replace('\\', '/')).ToList();
+    }
+
+    public static string Racine(Reglages r) => string.IsNullOrWhiteSpace(r.DossierSauvegardes)
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Steem", "Sauvegardes")
+        : r.DossierSauvegardes;
 
     public static string DossierJeu(Reglages r, string jeu)
     {
-        var racine = string.IsNullOrWhiteSpace(r.DossierSauvegardes)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Steem", "Sauvegardes")
-            : r.DossierSauvegardes;
         foreach (var c in Path.GetInvalidFileNameChars()) jeu = jeu.Replace(c, '_');
-        return Path.Combine(racine, jeu.Trim().TrimEnd('.'));
+        return Path.Combine(Racine(r), jeu.Trim().TrimEnd('.'));
+    }
+
+    // Le dossier d'un jeu garde son numéro Steam (steem-appid.txt) : la disquette de Steam retrouve ainsi sa dernière sauvegarde.
+    const string FichierAppid = "steem-appid.txt";
+
+    // Dernière sauvegarde de chaque jeu, en secondes Unix, par numéro Steam (LED de la disquette, 0.15.0).
+    public static Dictionary<int, long> Dernieres(Reglages r)
+    {
+        var res = new Dictionary<int, long>();
+        try
+        {
+            foreach (var jeu in new DirectoryInfo(Racine(r)).GetDirectories())
+            {
+                try
+                {
+                    var f = Path.Combine(jeu.FullName, FichierAppid);
+                    if (!File.Exists(f) || !int.TryParse(File.ReadAllText(f).Trim(), out var appid)) continue;
+                    var dates = jeu.GetDirectories().Where(d => d.GetFiles("mapping.yaml", SearchOption.AllDirectories).Length > 0)
+                                   .Select(d => d.CreationTime).ToList();
+                    if (dates.Count > 0) res[appid] = new DateTimeOffset(dates.Max()).ToUnixTimeSeconds();
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return res;
     }
 
     public static string NouveauProfil(string dossierJeu, string suffixe = "")
@@ -60,7 +157,10 @@ static class Ludusavi
         return p;
     }
 
-    public sealed record Profil(string Dossier, string Nom, DateTime Date, long Octets);
+    public sealed record Profil(string Dossier, string Nom, DateTime Date, long Octets)
+    {
+        public override string ToString() => Nom;   // nom lu par l'accessibilité de Windows
+    }
 
     public static List<Profil> Profils(string dossierJeu)
     {
@@ -89,8 +189,12 @@ static class Ludusavi
         return new Resultat(fichiers, octets, erreur);
     }
 
-    public static async Task<Resultat> Sauvegarder(string exe, string jeu, string dossier) =>
-        Lire(JsonNode.Parse(await Lancer(exe, "backup", "--force", "--api", "--no-cloud-sync", "--format", "zip", "--path", dossier, jeu)), jeu);
+    public static async Task<Resultat> Sauvegarder(string exe, string jeu, string dossier, int appid)
+    {
+        var r = Lire(JsonNode.Parse(await Lancer(exe, "backup", "--force", "--api", "--no-cloud-sync", "--format", "zip", "--path", dossier, jeu)), jeu);
+        if (r.Fichiers > 0) try { File.WriteAllText(Path.Combine(Path.GetDirectoryName(dossier)!, FichierAppid), appid.ToString()); } catch { }
+        return r;
+    }
 
     public static async Task<Resultat> Restaurer(string exe, string jeu, string dossier) =>
         Lire(JsonNode.Parse(await Lancer(exe, "restore", "--force", "--api", "--no-cloud-sync", "--path", dossier, jeu)), jeu);
@@ -185,19 +289,23 @@ class FenetreSombre : Form
 // Disquette de la page du jeu : sauvegarder maintenant ou restaurer une sauvegarde.
 sealed class FenetreSauvegardes : FenetreSombre
 {
+    readonly InterfaceSteam steam;
     readonly Reglages reglages;
     readonly int appid;
-    readonly Label etat;
+    readonly string nom;
+    readonly Label etat, source;
     readonly ListBox liste;
     readonly Button sauver, restaurer, ouvrir, fermer;
     string exe, jeu, dossierJeu;
     bool confirmer;
 
-    public FenetreSauvegardes(Reglages r, int appid, string nom) : base("Steem — Sauvegardes")
+    public FenetreSauvegardes(InterfaceSteam s, Reglages r, int appid, string nom) : base("Steem — Sauvegardes")
     {
-        reglages = r; this.appid = appid;
+        steam = s; reglages = r; this.appid = appid; this.nom = nom;
         Titre($"Sauvegardes de « {nom} »");
         Paragraphe("Fichiers du jeu sur ce PC : sauvegardes de partie, configs, binds.", Texte);
+        source = Paragraphe("", Pale);
+        source.Visible = false;
         liste = Ajouter(new ListBox
         {
             Size = new Size(Largeur, 6 * 30), BorderStyle = BorderStyle.None, BackColor = Bouton, ForeColor = Texte,
@@ -266,13 +374,20 @@ sealed class FenetreSauvegardes : FenetreSombre
             return;
         }
         etat.Text = "Recherche des fichiers du jeu…";
-        try { jeu = await Ludusavi.TrouverJeu(exe, appid); }
+        Ludusavi.Jeu j;
+        try { j = await Ludusavi.TrouverJeu(exe, appid, nom); }
         catch (Exception ex) { etat.ForeColor = Rouge; etat.Text = "Ludusavi a échoué : " + ex.Message; return; }
-        if (jeu == null)
+        if (j == null)
         {
             etat.ForeColor = Rouge;
-            etat.Text = "Ludusavi ne connaît pas les fichiers de ce jeu.";
+            etat.Text = "Fichiers du jeu introuvables : absent de la base de Ludusavi et des dossiers habituels.";
             return;
+        }
+        jeu = j.Nom;
+        if (j.Dossiers != null)
+        {
+            source.Text = "Jeu absent de la base de Ludusavi. Dossiers trouvés par Steem :\n" + string.Join("\n", j.Dossiers);
+            source.Visible = true;
         }
         dossierJeu = Ludusavi.DossierJeu(reglages, jeu);
         etat.Text = "";
@@ -288,7 +403,7 @@ sealed class FenetreSauvegardes : FenetreSombre
         var dossier = Ludusavi.NouveauProfil(dossierJeu);
         try
         {
-            var r = await Ludusavi.Sauvegarder(exe, jeu, dossier);
+            var r = await Ludusavi.Sauvegarder(exe, jeu, dossier, appid);
             if (r.Fichiers == 0 || r.Erreur != null)
             {
                 etat.ForeColor = Rouge;
@@ -304,6 +419,7 @@ sealed class FenetreSauvegardes : FenetreSombre
         }
         catch (Exception ex) { etat.ForeColor = Rouge; etat.Text = "Échec de la sauvegarde : " + ex.Message; }
         Boutons(true);
+        _ = steam?.PublierSauvegardes();
     }
 
     async Task Restaurer()
@@ -325,7 +441,7 @@ sealed class FenetreSauvegardes : FenetreSombre
         try
         {
             var copie = Ludusavi.NouveauProfil(dossierJeu, " (avant restauration)");
-            var c = await Ludusavi.Sauvegarder(exe, jeu, copie);
+            var c = await Ludusavi.Sauvegarder(exe, jeu, copie, appid);
             if (c.Fichiers == 0) try { Directory.Delete(copie, true); } catch { }
             else if (c.Erreur != null)
             {
@@ -350,6 +466,7 @@ sealed class FenetreSauvegardes : FenetreSombre
         }
         catch (Exception ex) { etat.ForeColor = Rouge; etat.Text = "Échec de la restauration : " + ex.Message; }
         Boutons(true);
+        _ = steam?.PublierSauvegardes();
     }
 
     void Ouvrir()
