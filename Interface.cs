@@ -21,7 +21,7 @@ sealed class InterfaceSteam : IDisposable
     readonly string script;
     ClientWebSocket ws;
     int prochainId = 10;
-    FenetreDesinstaller fenetre;
+    Form fenetre;
 
     public InterfaceSteam(Reglages r)
     {
@@ -102,21 +102,21 @@ sealed class InterfaceSteam : IDisposable
             try
             {
                 var appel = JsonNode.Parse((string)m["params"]["payload"]);
-                if ((string)appel?["action"] == "desinstaller")
-                {
-                    int appid = (int)appel["appid"];
-                    string nom = (string)appel["nom"] ?? "";
-                    ui.Post(_ => Desinstaller(appid, nom), null);
-                }
+                var action = (string)appel?["action"];
+                int appid = (int)appel["appid"];
+                string nom = (string)appel["nom"] ?? "";
+                if (action == "desinstaller") ui.Post(_ => Ouvrir(() => new FenetreDesinstaller(this, reglages, appid, nom)), null);
+                else if (action == "sauvegardes") ui.Post(_ => Ouvrir(() => new FenetreSauvegardes(reglages, appid, nom)), null);
             }
             catch { }
         }
     }
 
-    void Desinstaller(int appid, string nom)
+    // Une seule fenêtre de Steem à la fois : un nouveau clic ramène celle déjà ouverte.
+    void Ouvrir(Func<Form> creer)
     {
         if (fenetre != null && !fenetre.IsDisposed) { fenetre.Activate(); return; }
-        fenetre = new FenetreDesinstaller(this, reglages, appid, nom);
+        fenetre = creer();
         fenetre.Show();
         fenetre.Activate();
     }
@@ -133,156 +133,65 @@ sealed class InterfaceSteam : IDisposable
 }
 
 // Fenêtre sombre : sauvegarder le profil du jeu (Ludusavi) puis désinstaller, ou désinstaller directement.
-sealed class FenetreDesinstaller : Form
+sealed class FenetreDesinstaller : FenetreSombre
 {
-    static readonly Color Fond = Color.FromArgb(0x17, 0x1d, 0x25), Texte = Color.FromArgb(0xc7, 0xd5, 0xe0),
-                          Pale = Color.FromArgb(0x8f, 0x98, 0xa0), Accent = Color.FromArgb(0x1a, 0x9f, 0xff),
-                          Bouton = Color.FromArgb(0x2a, 0x33, 0x40), Rouge = Color.FromArgb(0xe5, 0x48, 0x3f);
-
     readonly InterfaceSteam steam;
     readonly Reglages reglages;
     readonly int appid;
-    readonly string nom;
     readonly Label etat;
     readonly Button sauver, direct, annuler;
 
-    public FenetreDesinstaller(InterfaceSteam s, Reglages r, int appid, string nom)
+    public FenetreDesinstaller(InterfaceSteam s, Reglages r, int appid, string nom) : base("Steem — Désinstaller")
     {
-        steam = s; reglages = r; this.appid = appid; this.nom = nom;
-        Text = "Steem — Désinstaller";
-        Icon = Icone.Charger(32);
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = MinimizeBox = false;
-        StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Fond; ForeColor = Texte;
-        Font = new Font("Segoe UI", 10f);
-        AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(520, 210);
-        TopMost = true;
-
-        var titre = new Label
-        {
-            Text = $"Désinstaller « {nom} »", Font = new Font("Segoe UI Semibold", 13f), ForeColor = Color.White,
-            AutoSize = false, Bounds = new Rectangle(20, 16, 480, 30), AutoEllipsis = true,
-        };
-        var question = new Label
-        {
-            Text = "Sauvegarder d'abord le profil du jeu (sauvegardes, configs, binds) ?",
-            AutoSize = false, Bounds = new Rectangle(20, 52, 480, 24),
-        };
-        etat = new Label { AutoSize = false, Bounds = new Rectangle(20, 80, 480, 60), ForeColor = Pale };
-        sauver = Creer("Sauvegarder puis désinstaller", Accent, new Rectangle(20, 152, 230, 38));
-        direct = Creer("Désinstaller sans sauvegarde", Bouton, new Rectangle(260, 152, 160, 38));
-        annuler = Creer("Annuler", Bouton, new Rectangle(430, 152, 70, 38));
+        steam = s; reglages = r; this.appid = appid;
+        Titre($"Désinstaller « {nom} »");
+        Paragraphe("Sauvegarder d'abord le profil du jeu (sauvegardes, configs, binds) ?", Texte);
+        etat = Paragraphe("", Pale, 44);
+        sauver = BoutonBas("Sauvegarder puis désinstaller", Accent);
+        direct = BoutonBas("Désinstaller sans sauvegarde", Bouton);
+        annuler = BoutonBas("Annuler", Bouton);
+        PoserBarre();
         sauver.Click += async (_, _) => await Sauvegarder();
         direct.Click += async (_, _) => await Finir();
         annuler.Click += (_, _) => Close();
         CancelButton = annuler;
-        Controls.AddRange([titre, question, etat, sauver, direct, annuler]);
-        if (CheminLudusavi() == null)
+        if (Ludusavi.Chemin(reglages) == null)
         {
             sauver.Enabled = false;
             etat.Text = "Ludusavi introuvable : la sauvegarde n'est pas possible (réglage « Ludusavi » de Steem).";
         }
     }
 
-    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int v, int size);
-
-    protected override void OnHandleCreated(EventArgs e)
+    void Echec(string texte)
     {
-        base.OnHandleCreated(e);
-        int sombre = 1; DwmSetWindowAttribute(Handle, 20, ref sombre, 4); // barre de titre sombre
-    }
-
-    static Button Creer(string texte, Color fond, Rectangle place)
-    {
-        var b = new Button
-        {
-            Text = texte, Bounds = place, FlatStyle = FlatStyle.Flat, BackColor = fond, ForeColor = Color.White,
-            Cursor = Cursors.Hand, UseVisualStyleBackColor = false,
-        };
-        b.FlatAppearance.BorderSize = 0;
-        b.FlatAppearance.MouseOverBackColor = ControlPaint.Light(fond, 0.15f);
-        return b;
-    }
-
-    string CheminLudusavi()
-    {
-        if (!string.IsNullOrWhiteSpace(reglages.Ludusavi) && File.Exists(reglages.Ludusavi)) return reglages.Ludusavi;
-        var aCote = Path.Combine(AppContext.BaseDirectory, "ludusavi.exe");
-        if (File.Exists(aCote)) return aCote;
-        foreach (var d in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
-        {
-            try { var c = Path.Combine(d.Trim(), "ludusavi.exe"); if (File.Exists(c)) return c; } catch { }
-        }
-        return null;
-    }
-
-    static async Task<string> Lancer(string exe, params string[] args)
-    {
-        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8 };
-        foreach (var a in args) psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi)!;
-        var sortie = p.StandardOutput.ReadToEndAsync();
-        _ = p.StandardError.ReadToEndAsync();
-        await p.WaitForExitAsync();
-        return await sortie;
+        etat.ForeColor = Rouge;
+        etat.Text = texte;
+        direct.Text = "Désinstaller quand même";
+        direct.Enabled = annuler.Enabled = true;
     }
 
     async Task Sauvegarder()
     {
-        var exe = CheminLudusavi();
+        var exe = Ludusavi.Chemin(reglages);
         if (exe == null) return;
         sauver.Enabled = direct.Enabled = annuler.Enabled = false;
         etat.ForeColor = Pale;
         etat.Text = "Recherche des fichiers du jeu…";
         try
         {
-            var trouve = JsonNode.Parse(await Lancer(exe, "find", "--steam-id", appid.ToString(), "--api"));
-            var jeu = trouve?["games"]?.AsObject().Select(p => p.Key).FirstOrDefault();
-            if (jeu == null)
-            {
-                etat.ForeColor = Rouge;
-                etat.Text = "Ludusavi ne connaît pas les fichiers de ce jeu : rien n'a été sauvegardé.";
-                direct.Text = "Désinstaller quand même";
-                direct.Enabled = annuler.Enabled = true;
-                return;
-            }
-            var racine = string.IsNullOrWhiteSpace(reglages.DossierSauvegardes)
-                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Steem", "Sauvegardes")
-                : reglages.DossierSauvegardes;
-            var dossier = Path.Combine(racine, Nettoyer(jeu));
+            var jeu = await Ludusavi.TrouverJeu(exe, appid);
+            if (jeu == null) { Echec("Ludusavi ne connaît pas les fichiers de ce jeu : rien n'a été sauvegardé."); return; }
+            var dossier = Ludusavi.NouveauProfil(Ludusavi.DossierJeu(reglages, jeu), " (avant désinstallation)");
             etat.Text = "Sauvegarde en cours…";
-            var r = JsonNode.Parse(await Lancer(exe, "backup", "--force", "--api", "--format", "zip", "--path", dossier, jeu));
-            long octets = (long?)r?["overall"]?["processedBytes"] ?? (long?)r?["overall"]?["totalBytes"] ?? 0;
-            int fichiers = r?["games"]?[jeu]?["files"]?.AsObject().Count ?? 0;
-            bool erreur = r?["errors"] is JsonObject e && e.Count > 0;
-            if (fichiers == 0 || erreur)
-            {
-                etat.ForeColor = Rouge;
-                etat.Text = fichiers == 0 ? "Aucun fichier trouvé pour ce jeu : rien n'a été sauvegardé." : "La sauvegarde a rencontré une erreur, voir le dossier : " + dossier;
-                direct.Text = "Désinstaller quand même";
-                direct.Enabled = annuler.Enabled = true;
-                return;
-            }
+            var r = await Ludusavi.Sauvegarder(exe, jeu, dossier);
+            if (r.Fichiers == 0) { try { Directory.Delete(dossier, true); } catch { } Echec("Aucun fichier trouvé pour ce jeu : rien n'a été sauvegardé."); return; }
+            if (r.Erreur != null) { Echec("La sauvegarde a rencontré une erreur, voir le dossier : " + dossier); return; }
             etat.ForeColor = Texte;
-            etat.Text = $"✓ {fichiers} fichier{(fichiers > 1 ? "s" : "")} sauvegardé{(fichiers > 1 ? "s" : "")} ({octets / 1048576.0:0.0} Mo) dans\n{dossier}";
+            etat.Text = $"✓ {r.Fichiers} fichier{(r.Fichiers > 1 ? "s" : "")} sauvegardé{(r.Fichiers > 1 ? "s" : "")} ({Ludusavi.Taille(r.Octets)}) dans\n{dossier}";
             await Task.Delay(1200);
             await Finir();
         }
-        catch (Exception ex)
-        {
-            etat.ForeColor = Rouge;
-            etat.Text = "Échec de la sauvegarde : " + ex.Message;
-            direct.Text = "Désinstaller quand même";
-            direct.Enabled = annuler.Enabled = true;
-        }
-    }
-
-    static string Nettoyer(string s)
-    {
-        foreach (var c in Path.GetInvalidFileNameChars()) s = s.Replace(c, '_');
-        return s.Trim().TrimEnd('.');
+        catch (Exception ex) { Echec("Échec de la sauvegarde : " + ex.Message); }
     }
 
     async Task Finir()
