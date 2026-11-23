@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace Steem;
 
@@ -126,10 +127,11 @@ static class Ludusavi
     // Le dossier d'un jeu garde son numéro Steam (steem-appid.txt) : la disquette de Steam retrouve ainsi sa dernière sauvegarde.
     const string FichierAppid = "steem-appid.txt";
 
-    // Dernière sauvegarde de chaque jeu, en secondes Unix, par numéro Steam (LED de la disquette, 0.15.0).
-    public static Dictionary<int, long> Dernieres(Reglages r)
+    // Dernière sauvegarde de chaque jeu par numéro Steam : { t: secondes Unix, + compte rendu resume.json s'il existe }
+    // (LED et infobulle de la disquette, 0.15.0 / 0.16.0).
+    public static Dictionary<int, JsonObject> Dernieres(Reglages r)
     {
-        var res = new Dictionary<int, long>();
+        var res = new Dictionary<int, JsonObject>();
         try
         {
             foreach (var jeu in new DirectoryInfo(Racine(r)).GetDirectories())
@@ -138,9 +140,17 @@ static class Ludusavi
                 {
                     var f = Path.Combine(jeu.FullName, FichierAppid);
                     if (!File.Exists(f) || !int.TryParse(File.ReadAllText(f).Trim(), out var appid)) continue;
-                    var dates = jeu.GetDirectories().Where(d => d.GetFiles("mapping.yaml", SearchOption.AllDirectories).Length > 0)
-                                   .Select(d => d.CreationTime).ToList();
-                    if (dates.Count > 0) res[appid] = new DateTimeOffset(dates.Max()).ToUnixTimeSeconds();
+                    var dernier = jeu.GetDirectories().Where(EstProfil).OrderByDescending(d => d.CreationTime).FirstOrDefault();
+                    if (dernier == null) continue;
+                    var o = new JsonObject();
+                    try
+                    {
+                        var rf = Path.Combine(dernier.FullName, FichierResume);
+                        if (File.Exists(rf) && JsonNode.Parse(File.ReadAllText(rf)) is JsonObject lu) o = lu;
+                    }
+                    catch { }
+                    o["t"] = new DateTimeOffset(dernier.CreationTime).ToUnixTimeSeconds();
+                    res[appid] = o;
                 }
                 catch { }
             }
@@ -157,10 +167,15 @@ static class Ludusavi
         return p;
     }
 
-    public sealed record Profil(string Dossier, string Nom, DateTime Date, long Octets)
+    // Fichiers = sauvegarde Ludusavi restaurable ; Mods = nombre de mods de la liste (0 : aucune).
+    public sealed record Profil(string Dossier, string Nom, DateTime Date, long Octets, bool Fichiers, int Mods)
     {
         public override string ToString() => Nom;   // nom lu par l'accessibilité de Windows
+        public string PageMods => Path.Combine(Dossier, Steem.Mods.FichierPage);
     }
+
+    static bool EstProfil(DirectoryInfo d) =>
+        File.Exists(Path.Combine(d.FullName, Steem.Mods.FichierJson)) || d.GetFiles("mapping.yaml", SearchOption.AllDirectories).Length > 0;
 
     public static List<Profil> Profils(string dossierJeu)
     {
@@ -170,30 +185,85 @@ static class Ludusavi
         {
             try
             {
-                if (!d.GetFiles("mapping.yaml", SearchOption.AllDirectories).Any()) continue;
-                long octets = d.GetFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
-                liste.Add(new Profil(d.FullName, d.Name, d.CreationTime, octets));
+                bool fichiers = d.GetFiles("mapping.yaml", SearchOption.AllDirectories).Length > 0;
+                int mods = Steem.Mods.Compter(d.FullName);
+                if (!fichiers && mods == 0) continue;
+                long octets = d.GetFiles("*", SearchOption.AllDirectories)
+                               .Where(f => f.Name != Steem.Mods.FichierJson && f.Name != Steem.Mods.FichierPage).Sum(f => f.Length);
+                liste.Add(new Profil(d.FullName, d.Name, d.CreationTime, octets, fichiers, mods));
             }
             catch { }
         }
         return liste.OrderByDescending(p => p.Date).ToList();
     }
 
-    public sealed record Resultat(int Fichiers, long Octets, string Erreur);
+    // Une sauvegarde complète : fichiers de partie (Ludusavi, si le jeu est connu) + liste des mods.
+    public sealed record Bilan(Resultat Sauvegarde, int Mods, string Dossier)
+    {
+        public bool Vide => (Sauvegarde?.Fichiers ?? 0) == 0 && Mods == 0;
+        public string Erreur => Sauvegarde?.Erreur;
+        public string Resume()
+        {
+            var parts = new List<string>();
+            int f = Sauvegarde?.Fichiers ?? 0;
+            if (f > 0) parts.Add($"{f} fichier{(f > 1 ? "s" : "")} sauvegardé{(f > 1 ? "s" : "")} ({Taille(Sauvegarde.Octets)})");
+            if (Mods > 0) parts.Add($"liste de {Mods} mod{(Mods > 1 ? "s" : "")}");
+            return "✓ " + string.Join(" + ", parts);
+        }
+    }
+
+    public static async Task<Bilan> SauvegarderTout(Reglages r, string exe, Jeu jeu, string nomSteam, int appid, string suffixe = "")
+    {
+        var dossierJeu = DossierJeu(r, jeu?.Nom ?? nomSteam);
+        var dossier = NouveauProfil(dossierJeu, suffixe);
+        Resultat res = null;
+        if (exe != null && jeu != null) res = await Sauvegarder(exe, jeu.Nom, dossier, appid);
+        int mods = 0;
+        try { mods = await Steem.Mods.Ecrire(appid, nomSteam, dossier); } catch { }
+        var b = new Bilan(res, mods, dossier);
+        if (b.Vide) { try { if (Directory.Exists(dossier)) Directory.Delete(dossier, true); } catch { } }
+        else
+        {
+            try { File.WriteAllText(Path.Combine(dossierJeu, FichierAppid), appid.ToString()); } catch { }
+            try { File.WriteAllText(Path.Combine(dossier, FichierResume), Resume(res?.Chemins ?? [], mods).ToJsonString()); } catch { }
+        }
+        return b;
+    }
+
+    public sealed record Resultat(int Fichiers, long Octets, string Erreur, string[] Chemins);
 
     static Resultat Lire(JsonNode r, string jeu)
     {
         long octets = (long?)r?["overall"]?["processedBytes"] ?? (long?)r?["overall"]?["totalBytes"] ?? 0;
-        int fichiers = r?["games"]?[jeu]?["files"]?.AsObject().Count ?? 0;
+        var chemins = r?["games"]?[jeu]?["files"]?.AsObject().Select(p => p.Key).ToArray() ?? [];
         string erreur = r?["errors"] is JsonObject e && e.Count > 0 ? e.ToJsonString() : null;
-        return new Resultat(fichiers, octets, erreur);
+        return new Resultat(chemins.Length, octets, erreur, chemins);
+    }
+
+    // Compte rendu d'une sauvegarde (resume.json, infobulle de la disquette, 0.16.0) : les fichiers rangés
+    // d'après leur chemin. Ludusavi ne les classe pas : c'est une estimation (binds, puis parties, puis configs).
+    public const string FichierResume = "resume.json";
+    static readonly Regex Binds = new(@"bind|keymap|keyboard|input|control|actionmap|hotkey", RegexOptions.IgnoreCase);
+    static readonly Regex Parties = new(@"save|\.(sav|ess|fos|sl2)$", RegexOptions.IgnoreCase);
+    static readonly Regex Configs = new(@"config|setting|option|pref|\.(ini|cfg|conf|json|xml|ya?ml|toml)$", RegexOptions.IgnoreCase);
+
+    static JsonObject Resume(string[] chemins, int mods)
+    {
+        int b = 0, p = 0, c = 0, a = 0;
+        foreach (var x in chemins)
+        {
+            var f = x.Replace('\\', '/');
+            if (Binds.IsMatch(Path.GetFileName(f)) || Binds.IsMatch(f)) b++;
+            else if (Parties.IsMatch(f)) p++;
+            else if (Configs.IsMatch(f)) c++;
+            else a++;
+        }
+        return new JsonObject { ["parties"] = p, ["binds"] = b, ["configs"] = c, ["autres"] = a, ["mods"] = mods };
     }
 
     public static async Task<Resultat> Sauvegarder(string exe, string jeu, string dossier, int appid)
     {
-        var r = Lire(JsonNode.Parse(await Lancer(exe, "backup", "--force", "--api", "--no-cloud-sync", "--format", "zip", "--path", dossier, jeu)), jeu);
-        if (r.Fichiers > 0) try { File.WriteAllText(Path.Combine(Path.GetDirectoryName(dossier)!, FichierAppid), appid.ToString()); } catch { }
-        return r;
+        return Lire(JsonNode.Parse(await Lancer(exe, "backup", "--force", "--api", "--no-cloud-sync", "--format", "zip", "--path", dossier, jeu)), jeu);
     }
 
     public static async Task<Resultat> Restaurer(string exe, string jeu, string dossier) =>
@@ -208,7 +278,7 @@ class FenetreSombre : Form
     public static readonly Color Fond = Color.FromArgb(0x17, 0x1d, 0x25), Texte = Color.FromArgb(0xc7, 0xd5, 0xe0),
                                  Pale = Color.FromArgb(0x8f, 0x98, 0xa0), Accent = Color.FromArgb(0x1a, 0x9f, 0xff),
                                  Bouton = Color.FromArgb(0x2a, 0x33, 0x40), Rouge = Color.FromArgb(0xe5, 0x48, 0x3f);
-    protected const int Largeur = 540;
+    protected const int Largeur = 600;
     protected readonly FlowLayoutPanel corps, barre;
 
     protected FenetreSombre(string titreFenetre)
@@ -286,7 +356,7 @@ class FenetreSombre : Form
     }
 }
 
-// Disquette de la page du jeu : sauvegarder maintenant ou restaurer une sauvegarde.
+// Disquette de la page du jeu : sauvegarder maintenant, restaurer une sauvegarde, voir la liste des mods.
 sealed class FenetreSauvegardes : FenetreSombre
 {
     readonly InterfaceSteam steam;
@@ -295,15 +365,16 @@ sealed class FenetreSauvegardes : FenetreSombre
     readonly string nom;
     readonly Label etat, source;
     readonly ListBox liste;
-    readonly Button sauver, restaurer, ouvrir, fermer;
-    string exe, jeu, dossierJeu;
-    bool confirmer;
+    readonly Button sauver, restaurer, mods, ouvrir, fermer;
+    string exe, dossierJeu;
+    Ludusavi.Jeu jeu;      // null : fichiers de partie inconnus, seule la liste des mods est gardée
+    bool prete, confirmer;
 
     public FenetreSauvegardes(InterfaceSteam s, Reglages r, int appid, string nom) : base("Steem — Sauvegardes")
     {
         steam = s; reglages = r; this.appid = appid; this.nom = nom;
         Titre($"Sauvegardes de « {nom} »");
-        Paragraphe("Fichiers du jeu sur ce PC : sauvegardes de partie, configs, binds.", Texte);
+        Paragraphe("Fichiers du jeu sur ce PC (sauvegardes de partie, configs, binds) et liste des mods installés.", Texte);
         source = Paragraphe("", Pale);
         source.Visible = false;
         liste = Ajouter(new ListBox
@@ -316,16 +387,23 @@ sealed class FenetreSauvegardes : FenetreSombre
         etat = Paragraphe("", Pale, 44);
         sauver = BoutonBas("Sauvegarder maintenant", Accent);
         restaurer = BoutonBas("Restaurer", Bouton);
-        ouvrir = BoutonBas("Ouvrir le dossier", Bouton);
+        mods = BoutonBas("Liste des mods", Bouton);
+        ouvrir = BoutonBas("Dossier", Bouton);
         fermer = BoutonBas("Fermer", Bouton);
         PoserBarre();
         sauver.Click += async (_, _) => await Sauvegarder();
         restaurer.Click += async (_, _) => await Restaurer();
-        ouvrir.Click += (_, _) => Ouvrir();
+        mods.Click += (_, _) => { if (liste.SelectedItem is Ludusavi.Profil p) Lancer(p.PageMods); };
+        ouvrir.Click += (_, _) => { Directory.CreateDirectory(dossierJeu); Lancer(dossierJeu); };
         fermer.Click += (_, _) => Close();
         CancelButton = fermer;
         Boutons(false);
-        Load += async (_, _) => await Preparer();
+        Load += async (_, _) =>
+        {
+            // Liste aussi large que la rangée de boutons (cinq boutons : plus large que les textes).
+            liste.Width = Math.Max(liste.Width, barre.PreferredSize.Width - barre.Controls[^1].Margin.Right);
+            await Preparer();
+        };
     }
 
     void Dessiner(object s, DrawItemEventArgs e)
@@ -335,14 +413,21 @@ sealed class FenetreSauvegardes : FenetreSombre
         bool choisi = (e.State & DrawItemState.Selected) != 0;
         using (var f = new SolidBrush(choisi ? Color.FromArgb(0x3d, 0x6c, 0x8d) : Bouton)) e.Graphics.FillRectangle(f, e.Bounds);
         var r = Rectangle.Inflate(e.Bounds, -10, 0);
+        var droite = string.Join(" · ", new[]
+        {
+            p.Fichiers ? Ludusavi.Taille(p.Octets) : null,
+            p.Mods > 0 ? $"{p.Mods} mod{(p.Mods > 1 ? "s" : "")}" : null,
+        }.Where(x => x != null));
         TextRenderer.DrawText(e.Graphics, p.Nom, Font, r, Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(e.Graphics, Ludusavi.Taille(p.Octets), Font, r, choisi ? Color.White : Pale, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
+        TextRenderer.DrawText(e.Graphics, droite, Font, r, choisi ? Color.White : Pale, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
     }
 
     void Boutons(bool actifs)
     {
-        sauver.Enabled = actifs && jeu != null;
-        restaurer.Enabled = actifs && jeu != null && liste.SelectedItem != null;
+        var p = liste.SelectedItem as Ludusavi.Profil;
+        sauver.Enabled = actifs && prete;
+        restaurer.Enabled = actifs && prete && exe != null && jeu != null && p is { Fichiers: true };
+        mods.Enabled = actifs && p != null && p.Mods > 0 && File.Exists(p.PageMods);
         ouvrir.Enabled = actifs && dossierJeu != null;
         fermer.Enabled = true;
     }
@@ -367,29 +452,19 @@ sealed class FenetreSauvegardes : FenetreSombre
     async Task Preparer()
     {
         exe = Ludusavi.Chemin(reglages);
-        if (exe == null)
-        {
-            etat.ForeColor = Rouge;
-            etat.Text = "Ludusavi introuvable : sauvegarde impossible (réglage « Ludusavi » de Steem).";
-            return;
-        }
         etat.Text = "Recherche des fichiers du jeu…";
-        Ludusavi.Jeu j;
-        try { j = await Ludusavi.TrouverJeu(exe, appid, nom); }
-        catch (Exception ex) { etat.ForeColor = Rouge; etat.Text = "Ludusavi a échoué : " + ex.Message; return; }
-        if (j == null)
+        string info = null;
+        if (exe == null) info = "Ludusavi introuvable (réglage « Ludusavi » de Steem) : seule la liste des mods est gardée.";
+        else
         {
-            etat.ForeColor = Rouge;
-            etat.Text = "Fichiers du jeu introuvables : absent de la base de Ludusavi et des dossiers habituels.";
-            return;
+            try { jeu = await Ludusavi.TrouverJeu(exe, appid, nom); }
+            catch (Exception ex) { info = "Ludusavi a échoué (" + ex.Message + ") : seule la liste des mods est gardée."; }
+            if (jeu?.Dossiers != null) info = "Jeu absent de la base de Ludusavi. Dossiers trouvés par Steem :\n" + string.Join("\n", jeu.Dossiers);
+            else if (jeu == null && info == null) info = "Fichiers de partie introuvables (absent de la base de Ludusavi et des dossiers habituels) : seule la liste des mods est gardée.";
         }
-        jeu = j.Nom;
-        if (j.Dossiers != null)
-        {
-            source.Text = "Jeu absent de la base de Ludusavi. Dossiers trouvés par Steem :\n" + string.Join("\n", j.Dossiers);
-            source.Visible = true;
-        }
-        dossierJeu = Ludusavi.DossierJeu(reglages, jeu);
+        if (info != null) { source.Text = info; source.Visible = true; }
+        dossierJeu = Ludusavi.DossierJeu(reglages, jeu?.Nom ?? nom);
+        prete = true;
         etat.Text = "";
         Remplir();
         Boutons(true);
@@ -400,21 +475,19 @@ sealed class FenetreSauvegardes : FenetreSombre
         Desarmer();
         Boutons(false);
         etat.ForeColor = Pale; etat.Text = "Sauvegarde en cours…";
-        var dossier = Ludusavi.NouveauProfil(dossierJeu);
         try
         {
-            var r = await Ludusavi.Sauvegarder(exe, jeu, dossier, appid);
-            if (r.Fichiers == 0 || r.Erreur != null)
+            var b = await Ludusavi.SauvegarderTout(reglages, exe, jeu, nom, appid);
+            if (b.Vide)
             {
                 etat.ForeColor = Rouge;
-                etat.Text = r.Fichiers == 0 ? "Aucun fichier trouvé pour ce jeu : rien n'a été sauvegardé." : "La sauvegarde a rencontré une erreur : " + r.Erreur;
-                if (r.Fichiers == 0) try { Directory.Delete(dossier, true); } catch { }
+                etat.Text = b.Erreur != null ? "La sauvegarde a rencontré une erreur : " + b.Erreur : "Rien à sauvegarder : ni fichiers de partie, ni mods trouvés.";
             }
             else
             {
-                Remplir(dossier);
-                etat.ForeColor = Texte;
-                etat.Text = $"✓ {r.Fichiers} fichier{(r.Fichiers > 1 ? "s" : "")} sauvegardé{(r.Fichiers > 1 ? "s" : "")} ({Ludusavi.Taille(r.Octets)}).";
+                Remplir(b.Dossier);
+                etat.ForeColor = b.Erreur != null ? Rouge : Texte;
+                etat.Text = b.Erreur != null ? b.Resume() + ", mais Ludusavi signale une erreur : " + b.Erreur : b.Resume() + ".";
             }
         }
         catch (Exception ex) { etat.ForeColor = Rouge; etat.Text = "Échec de la sauvegarde : " + ex.Message; }
@@ -424,7 +497,7 @@ sealed class FenetreSauvegardes : FenetreSombre
 
     async Task Restaurer()
     {
-        if (liste.SelectedItem is not Ludusavi.Profil p) return;
+        if (liste.SelectedItem is not Ludusavi.Profil p || !p.Fichiers || jeu == null) return;
         if (!confirmer)
         {
             // Premier clic : on explique, le second clic restaure.
@@ -432,7 +505,7 @@ sealed class FenetreSauvegardes : FenetreSombre
             restaurer.Text = "Confirmer la restauration";
             Couleur(restaurer, Rouge);
             etat.ForeColor = Texte;
-            etat.Text = $"Les fichiers actuels du jeu seront remplacés par ceux du {p.Nom}. Une copie de l'état actuel est faite juste avant. Ferme le jeu s'il tourne.";
+            etat.Text = $"Les fichiers actuels du jeu seront remplacés par ceux du {p.Nom}. Une copie de l'état actuel est faite juste avant. Ferme le jeu s'il tourne. Les mods ne sont pas réinstallés : leur liste sert à les retrouver.";
             return;
         }
         Desarmer();
@@ -440,10 +513,8 @@ sealed class FenetreSauvegardes : FenetreSombre
         etat.ForeColor = Pale; etat.Text = "Copie de l'état actuel…";
         try
         {
-            var copie = Ludusavi.NouveauProfil(dossierJeu, " (avant restauration)");
-            var c = await Ludusavi.Sauvegarder(exe, jeu, copie, appid);
-            if (c.Fichiers == 0) try { Directory.Delete(copie, true); } catch { }
-            else if (c.Erreur != null)
+            var c = await Ludusavi.SauvegarderTout(reglages, exe, jeu, nom, appid, " (avant restauration)");
+            if (c.Erreur != null)
             {
                 etat.ForeColor = Rouge;
                 etat.Text = "La copie de l'état actuel a échoué, restauration annulée : " + c.Erreur;
@@ -451,7 +522,7 @@ sealed class FenetreSauvegardes : FenetreSombre
                 return;
             }
             etat.Text = "Restauration en cours…";
-            var r = await Ludusavi.Restaurer(exe, jeu, p.Dossier);
+            var r = await Ludusavi.Restaurer(exe, jeu.Nom, p.Dossier);
             Remplir(p.Dossier);
             if (r.Erreur != null || r.Fichiers == 0)
             {
@@ -469,13 +540,8 @@ sealed class FenetreSauvegardes : FenetreSombre
         _ = steam?.PublierSauvegardes();
     }
 
-    void Ouvrir()
+    static void Lancer(string chemin)
     {
-        try
-        {
-            Directory.CreateDirectory(dossierJeu);
-            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{dossierJeu}\"") { UseShellExecute = true });
-        }
-        catch { }
+        try { Process.Start(new ProcessStartInfo(chemin) { UseShellExecute = true }); } catch { }
     }
 }

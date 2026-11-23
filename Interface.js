@@ -97,9 +97,12 @@
   const date = t => new Date(t * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const heure = t => new Date(t * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const led = (b, appid, o) => {
-    const t = (window.__steemSauv || {})[appid] || 0;
+    // Steem envoie { t, parties, binds, configs, autres, mods } (0.16.0) ; un simple nombre avant.
+    const v = (window.__steemSauv || {})[appid];
+    const t = typeof v === 'number' ? v : (v && v.t) || 0;
+    const r = v && typeof v === 'object' && 'mods' in v ? v : null;
     const lance = o.rt_last_time_played || 0;
-    const etat = t + '|' + lance;
+    const etat = JSON.stringify(v || 0) + '|' + lance;
     if (b.dataset.etat === etat) return;
     b.dataset.etat = etat;
     const l = b.querySelector('.steem-led'), d = b.querySelector('.steem-date');
@@ -108,9 +111,14 @@
     l.style.background = couleur;
     l.style.boxShadow = t ? '0 0 6px ' + couleur : 'none';
     d.textContent = t ? date(t) : 'Aucune';
-    b.dataset.info = 'Sauvegarder ou restaurer les fichiers du jeu (Steem)\n'
-      + 'Dernière sauvegarde : ' + (t ? date(t) + ' ' + heure(t) : 'aucune') + '\n'
-      +'Dernier lancement : ' + (lance ? date(lance) + ' ' + heure(lance) : 'jamais');
+    // Compte rendu de la dernière sauvegarde : ✅ + nombre, ou « — aucun » (Kev 24/11).
+    const ligne = (n, texte) => (n > 0 ? '✅ ' + texte + ' (' + n + ')' : '—  ' + texte + ' : aucun');
+    const detail = r ? '\n' + [ligne(r.parties, 'Sauvegardes de partie'), ligne(r.binds, 'Binds'),
+      ligne(r.configs, 'Configs'), ligne(r.mods, 'Liste des mods')].join('\n')
+      + (r.autres > 0 ? '\n✅ Autres fichiers (' + r.autres + ')' : '') : '';
+    b.dataset.info = 'Sauvegarder ou restaurer les fichiers du jeu (Steem)\n\n'
+      + 'Dernière sauvegarde : ' + (t ? date(t) + ' ' + heure(t) : 'aucune') + detail + '\n\n'
+      + 'Dernier lancement : ' + (lance ? date(lance) + ' ' + heure(lance) : 'jamais');
   };
 
   const cycle = () => {

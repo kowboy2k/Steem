@@ -9,7 +9,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>Steem</AssemblyName>
     <Product>Steem</Product>
-    <Version>0.15.7</Version>
+    <Version>0.16.0</Version>
     <ApplicationIcon>Steem.ico</ApplicationIcon>
   </PropertyGroup>
 

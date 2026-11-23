@@ -157,7 +157,7 @@ sealed class FenetreDesinstaller : FenetreSombre
     {
         steam = s; reglages = r; this.appid = appid; this.nom = nom;
         Titre($"Désinstaller « {nom} »");
-        Paragraphe("Sauvegarder d'abord le profil du jeu (sauvegardes, configs, binds) ?", Texte);
+        Paragraphe("Sauvegarder d'abord le profil du jeu (sauvegardes, configs, binds) et la liste de ses mods ?", Texte);
         etat = Paragraphe("", Pale, 44);
         sauver = BoutonBas("Sauvegarder puis désinstaller", Accent);
         direct = BoutonBas("Désinstaller sans sauvegarde", Bouton);
@@ -168,10 +168,7 @@ sealed class FenetreDesinstaller : FenetreSombre
         annuler.Click += (_, _) => Close();
         CancelButton = annuler;
         if (Ludusavi.Chemin(reglages) == null)
-        {
-            sauver.Enabled = false;
-            etat.Text = "Ludusavi introuvable : la sauvegarde n'est pas possible (réglage « Ludusavi » de Steem).";
-        }
+            etat.Text = "Ludusavi introuvable (réglage « Ludusavi » de Steem) : seule la liste des mods sera gardée.";
     }
 
     void Echec(string texte)
@@ -185,22 +182,19 @@ sealed class FenetreDesinstaller : FenetreSombre
     async Task Sauvegarder()
     {
         var exe = Ludusavi.Chemin(reglages);
-        if (exe == null) return;
         sauver.Enabled = direct.Enabled = annuler.Enabled = false;
         etat.ForeColor = Pale;
         etat.Text = "Recherche des fichiers du jeu…";
         try
         {
-            var j = await Ludusavi.TrouverJeu(exe, appid, nom);
-            if (j == null) { Echec("Fichiers du jeu introuvables (absent de la base de Ludusavi et des dossiers habituels) : rien n'a été sauvegardé."); return; }
-            var jeu = j.Nom;
-            var dossier = Ludusavi.NouveauProfil(Ludusavi.DossierJeu(reglages, jeu), " (avant désinstallation)");
+            // Jeu inconnu de Ludusavi : la liste des mods est quand même gardée (0.16.0).
+            var j = exe == null ? null : await Ludusavi.TrouverJeu(exe, appid, nom);
             etat.Text = "Sauvegarde en cours…";
-            var r = await Ludusavi.Sauvegarder(exe, jeu, dossier, appid);
-            if (r.Fichiers == 0) { try { Directory.Delete(dossier, true); } catch { } Echec("Aucun fichier trouvé pour ce jeu : rien n'a été sauvegardé."); return; }
-            if (r.Erreur != null) { Echec("La sauvegarde a rencontré une erreur, voir le dossier : " + dossier); return; }
+            var b = await Ludusavi.SauvegarderTout(reglages, exe, j, nom, appid, " (avant désinstallation)");
+            if (b.Vide) { Echec(b.Erreur != null ? "La sauvegarde a rencontré une erreur : " + b.Erreur : "Rien à sauvegarder : ni fichiers de partie, ni mods trouvés."); return; }
+            if (b.Erreur != null) { Echec("La sauvegarde a rencontré une erreur, voir le dossier : " + b.Dossier); return; }
             etat.ForeColor = Texte;
-            etat.Text = $"✓ {r.Fichiers} fichier{(r.Fichiers > 1 ? "s" : "")} sauvegardé{(r.Fichiers > 1 ? "s" : "")} ({Ludusavi.Taille(r.Octets)}) dans\n{dossier}";
+            etat.Text = $"{b.Resume()} dans\n{b.Dossier}";
             await Task.Delay(1200);
             await Finir();
         }
