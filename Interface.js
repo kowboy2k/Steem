@@ -67,11 +67,17 @@
       + 'box-shadow:0 2px 8px rgba(0,0,0,.6)';
     const texte = t => { const s = doc.createElement('div'); s.textContent = t; x.appendChild(s); };
     texte(b.dataset.info || '');
-    for (const s of b._sources || []) {
-      const a = doc.createElement('div');
-      a.textContent = '      › ' + s.titre + ' (' + s.n + ')';
-      a.title = '';
+    // « Liste des mods : NexusMods [1153] ✅, Workshop [32] ✅ » (Kev 24/11) : chaque source ouvre sa liste.
+    const sources = b._sources || [];
+    const ligneMods = doc.createElement('div');
+    if (sources.length) ligneMods.appendChild(doc.createTextNode('Liste des mods : '));
+    for (const s of sources) {
+      if (s.i > 0) ligneMods.appendChild(doc.createTextNode(', '));
+      const a = doc.createElement('span');
+      a.textContent = s.etiquette + ' [' + s.n + ']';
       a.style.cssText = 'color:#1a9fff;cursor:pointer';
+      ligneMods.appendChild(a);
+      ligneMods.appendChild(doc.createTextNode(' ✅'));
       a.addEventListener('mouseenter', () => { a.style.textDecoration = 'underline'; });
       a.addEventListener('mouseleave', () => { a.style.textDecoration = 'none'; });
       a.addEventListener('click', e => {
@@ -80,8 +86,8 @@
         const ov = appStore.GetAppOverviewByAppID(Number(b.dataset.appid));
         window.steemAppel(JSON.stringify({ action: 'mods', appid: Number(b.dataset.appid), nom: ov ? ov.display_name : '', source: s.i }));
       });
-      x.appendChild(a);
     }
+    if (sources.length) x.appendChild(ligneMods);
     if (b.dataset.fin) texte(b.dataset.fin);
     x.addEventListener('mouseenter', () => clearTimeout(delaiBulle));
     x.addEventListener('mouseleave', () => cacherBientot(doc));
@@ -137,11 +143,18 @@
     const ligne = (n, texte) => (n > 0 ? '✅ ' + texte + ' (' + n + ')' : '—  ' + texte + ' : aucun');
     const detail = r ? '\n' + [ligne(r.parties, 'Sauvegardes de partie'), ligne(r.binds, 'Binds'),
       ligne(r.configs, 'Configs')].concat(r.autres > 0 ? ['✅ Autres fichiers (' + r.autres + ')'] : [])
-      .concat([ligne(r.mods, 'Liste des mods')]).join('\n') : '';
+      .concat(r.mods > 0 && Array.isArray(r.sources) && r.sources.length ? [] : [ligne(r.mods, 'Liste des mods')]).join('\n') : '';
     b.dataset.info = 'Sauvegarder ou restaurer les fichiers du jeu (Steem)\n\n'
       + 'Dernière sauvegarde : ' + (t ? date(t) + ' ' + heure(t) : 'aucune') + detail;
     // Sources de la liste (Workshop, Mod Organizer, DMM…), cliquables sous « Liste des mods ».
-    b._sources = r && Array.isArray(r.sources) ? r.sources.map((s, i) => ({ titre: s.titre, n: s.n, i })) : [];
+    // Étiquette par plateforme : Mod Organizer et DMM → NexusMods ; deux sources de même plateforme → nom de l'instance en plus.
+    const plateforme = t => /^Workshop/.test(t) ? 'Workshop' : /^(Mod Organizer|DMM)/.test(t) ? 'NexusMods' : 'Dossier du jeu';
+    const liste = r && Array.isArray(r.sources) ? r.sources : [];
+    b._sources = liste.map((s, i) => {
+      const p = plateforme(s.titre), double = liste.filter(x => plateforme(x.titre) === p).length > 1;
+      const instance = (s.titre.split(' — ')[1] || '').trim();
+      return { etiquette: double && instance ? p + ' · ' + instance : p, n: s.n, i };
+    });
     b.dataset.fin = '\nDernier lancement : ' + (lance ? date(lance) + ' ' + heure(lance) : 'jamais');
   };
 
