@@ -51,7 +51,7 @@ static class Mods
 
     public static async Task<int> Ecrire(int appid, string nomJeu, string dossierProfil)
     {
-        var sources = await Lister(appid);
+        var sources = await Task.Run(() => Lister(appid));   // recherche des instances sur les disques : hors du fil de l'interface
         int total = sources.Sum(s => s.Mods.Count);
         if (total == 0) return 0;
         Directory.CreateDirectory(dossierProfil);
@@ -241,6 +241,31 @@ static class Mods
         if (Directory.Exists(racine))
             foreach (var d in Directory.GetDirectories(racine))
                 if (File.Exists(Path.Combine(d, "ModOrganizer.ini")) && vues.Add(d)) yield return d;
+        // Instances ouvertes, puis instances portables non déclarées à 1 ou 2 niveaux des disques
+        // (ex. F:\Skyrim V2000, ouverte par Kev le 24/11 et inconnue des deux listes ci-dessus).
+        foreach (var p in System.Diagnostics.Process.GetProcessesByName("ModOrganizer"))
+        {
+            string d = null;
+            try { d = Path.GetDirectoryName(p.MainModule?.FileName); } catch { }
+            p.Dispose();
+            if (d != null && File.Exists(Path.Combine(d, "ModOrganizer.ini")) && vues.Add(d)) yield return d;
+        }
+        foreach (var disque in DriveInfo.GetDrives().Where(x => x.DriveType == DriveType.Fixed && x.IsReady))
+        {
+            string[] n1;
+            try { n1 = Directory.GetDirectories(disque.RootDirectory.FullName); } catch { continue; }
+            foreach (var d1 in n1)
+            {
+                var nom = Path.GetFileName(d1);
+                if (nom.StartsWith('$') || nom is "Windows" or "Program Files" or "Program Files (x86)" or "ProgramData"
+                    or "Users" or "System Volume Information" or "Recovery") continue;
+                if (File.Exists(Path.Combine(d1, "ModOrganizer.ini")) && vues.Add(d1)) yield return d1;
+                string[] n2;
+                try { n2 = Directory.GetDirectories(d1); } catch { continue; }
+                foreach (var d2 in n2)
+                    if (File.Exists(Path.Combine(d2, "ModOrganizer.ini")) && vues.Add(d2)) yield return d2;
+            }
+        }
     }
 
     static IEnumerable<Source> ModOrganizer(int appid, string installation)

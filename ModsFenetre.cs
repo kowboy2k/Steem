@@ -46,24 +46,57 @@ sealed class FenetreMods : FenetreSombre
     readonly int numero;
     bool confirmer, enCours;
 
+    static readonly Color Panneau = Color.FromArgb(0x1f, 0x27, 0x31), LigneA = Color.FromArgb(0x24, 0x2c, 0x37),
+                          LigneB = Color.FromArgb(0x29, 0x32, 0x3e), Section = Color.FromArgb(0x37, 0x41, 0x50),
+                          Vert = Color.FromArgb(0x2e, 0x6b, 0x3a), Lien = Color.FromArgb(0x66, 0xc0, 0xff);
+    readonly Dictionary<Mods.Mod, int> rangs = new();
+    readonly Label puceImporter, pucePresents, puceSansLien, explication;
+
+    // Mise en page (0.16.3, Kev 24/11 : « plus agréable à lire ») : en-tête jeu / plateforme / infos, liste numérotée
+    // à lignes alternées, puis un bloc « Importer » à part avec des pastilles de comptes.
     public FenetreMods(InterfaceSteam s, int appid, string nomJeu, string dossierProfil, int numeroSource) : base("Steem — Mods")
     {
         steam = s; this.appid = appid; dossier = dossierProfil; numero = numeroSource;
         var sources = Mods.Lire(dossierProfil);
         source = numeroSource >= 0 && numeroSource < sources.Count ? sources[numeroSource] : new Mods.Source("?", "", new());
-        Titre($"Mods de « {nomJeu} » — {source.Titre}");
-        Paragraphe($"{source.Detail}\nListe de la sauvegarde « {Path.GetFileName(dossierProfil)} » · {source.Mods.Count(m => m.Actif)} actifs sur {source.Mods.Count}. Un clic sur un nom ouvre sa page.", Pale);
+
+        // En-tête
+        Titre($"Mods de « {nomJeu} »");
+        var plateforme = source.Titre.StartsWith("Workshop") ? "Workshop Steam"
+                       : source.Titre.StartsWith("Mod Organizer") || source.Titre.StartsWith("DMM") ? "NexusMods" : "Dossier du jeu";
+        var outil = source.Titre.Contains(" — ") ? source.Titre[(source.Titre.IndexOf(" — ") + 3)..] : null;
+        var gestionnaire = source.Titre.StartsWith("Mod Organizer") ? "Mod Organizer 2" : source.Titre.StartsWith("DMM") ? "DMM" : null;
+        var sousTitre = Ajouter(new Label
+        {
+            Text = plateforme + (outil != null ? " · " + outil : "") + (gestionnaire != null ? $"  ({gestionnaire})" : ""),
+            Font = new Font("Segoe UI Semibold", 11f), ForeColor = Accent, AutoSize = true, Margin = new Padding(0, 0, 0, 2),
+        });
+        var profil = Regex.Match(source.Detail ?? "", "Profil « (.+?) »").Groups[1].Value;
+        int actifs = source.Mods.Count(m => m.Actif);
+        var infos = new List<string>();
+        if (profil.Length > 0) infos.Add($"Profil « {profil} »");
+        infos.Add(actifs == source.Mods.Count ? $"{source.Mods.Count} mods" : $"{actifs} actifs sur {source.Mods.Count}");
+        infos.Add($"sauvegarde du {Path.GetFileName(dossierProfil)}");
+        Ajouter(new Label
+        {
+            Text = string.Join("   ·   ", infos), ForeColor = Pale, AutoSize = true, Font = new Font("Segoe UI", 9f),
+            Margin = new Padding(0, 0, 0, 10),
+        });
+
+        // Liste
         liste = Ajouter(new ListBox
         {
-            Size = new Size(Largeur, 14 * 26), BorderStyle = BorderStyle.None, BackColor = Bouton, ForeColor = Texte,
-            DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 26, IntegralHeight = false, Margin = new Padding(0, 6, 0, 6),
+            Size = new Size(Largeur, 13 * 28), BorderStyle = BorderStyle.None, BackColor = LigneA, ForeColor = Texte,
+            DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 28, IntegralHeight = false, Margin = new Padding(0, 0, 0, 2),
             SelectionMode = SelectionMode.None,
         });
         string section = null;
+        int rang = 0;
         foreach (var m in source.Mods)
         {
             if (m.Section != null && m.Section != section) liste.Items.Add(m.Section);
             section = m.Section;
+            rangs[m] = ++rang;
             liste.Items.Add(m);
         }
         liste.DrawItem += Dessiner;
@@ -77,16 +110,41 @@ sealed class FenetreMods : FenetreSombre
             int i = liste.IndexFromPoint(e.Location);
             if (i >= 0 && liste.Items[i] is Mods.Mod { Lien: { } lien }) Navigateur.Ouvrir(lien);
         };
+        Ajouter(new Label
+        {
+            Text = "Un clic sur un nom en bleu ouvre sa page (adresse connue au moment de la sauvegarde). Grisé : mod désactivé.",
+            ForeColor = Pale, AutoSize = true, MaximumSize = new Size(Largeur, 0), Font = new Font("Segoe UI", 8.5f),
+            Margin = new Padding(0, 0, 0, 12),
+        });
 
-        var ligne = Ajouter(new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 4, 0, 0) });
-        ligne.Controls.Add(new Label { Text = "Importer dans :", AutoSize = true, ForeColor = Texte, Margin = new Padding(0, 6, 8, 0) });
+        // Bloc « Importer »
+        var bloc = Ajouter(new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, BackColor = Panneau,
+            Padding = new Padding(14, 12, 14, 12), Margin = new Padding(0), MinimumSize = new Size(Largeur, 0),
+        });
+        bloc.Controls.Add(new Label
+        {
+            Text = "IMPORTER DANS UN GESTIONNAIRE DE MODS", ForeColor = Pale, AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 8.5f), Margin = new Padding(0, 0, 0, 6),
+        });
         cibles = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Bouton, ForeColor = Color.White,
-            Width = 380, Margin = new Padding(0, 2, 0, 0),
+            Width = Largeur - 28, Margin = new Padding(0, 0, 0, 10),
         };
-        ligne.Controls.Add(cibles);
-        etat = Paragraphe("", Pale, 40);
+        bloc.Controls.Add(cibles);
+        var puces = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 8), BackColor = Panneau };
+        Label Puce(Color fond) { var l = new Label { AutoSize = true, BackColor = fond, ForeColor = Color.White, Padding = new Padding(8, 3, 8, 3), Margin = new Padding(0, 0, 8, 0) }; puces.Controls.Add(l); return l; }
+        puceImporter = Puce(Accent);
+        pucePresents = Puce(Vert);
+        puceSansLien = Puce(Bouton);
+        bloc.Controls.Add(puces);
+        explication = new Label { ForeColor = Pale, AutoSize = true, MaximumSize = new Size(Largeur - 28, 0), Font = new Font("Segoe UI", 9f), Margin = new Padding(0) };
+        bloc.Controls.Add(explication);
+        etat = new Label { ForeColor = Texte, AutoSize = true, MaximumSize = new Size(Largeur - 28, 0), Margin = new Padding(0, 8, 0, 0), Visible = false };
+        bloc.Controls.Add(etat);
+
         importer = BoutonBas("Importer", Accent);
         page = BoutonBas("Page complète", Bouton);
         fermer = BoutonBas("Fermer", Bouton);
@@ -96,30 +154,38 @@ sealed class FenetreMods : FenetreSombre
         fermer.Click += (_, _) => Close();
         CancelButton = fermer;
         cibles.SelectedIndexChanged += (_, _) => { Desarmer(); Compter(); };
-        Load += (_, _) =>
-        {
-            liste.Width = Math.Max(liste.Width, barre.PreferredSize.Width - barre.Controls[^1].Margin.Right);
-            ChercherCibles();
-        };
+        Load += (_, _) => ChercherCibles();
+    }
+
+    void Message(string texte, Color couleur)
+    {
+        etat.Text = texte;
+        etat.ForeColor = couleur;
+        etat.Visible = !string.IsNullOrEmpty(texte);
     }
 
     void Dessiner(object s, DrawItemEventArgs e)
     {
         if (e.Index < 0) return;
-        var r = Rectangle.Inflate(e.Bounds, -10, 0);
+        var r = Rectangle.Inflate(e.Bounds, -12, 0);
         if (liste.Items[e.Index] is string sec)
         {
-            using (var f = new SolidBrush(Color.FromArgb(0x37, 0x41, 0x50))) e.Graphics.FillRectangle(f, e.Bounds);
-            using var gras = new Font(Font, FontStyle.Bold);
-            TextRenderer.DrawText(e.Graphics, sec, gras, r, Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            using (var f = new SolidBrush(Section)) e.Graphics.FillRectangle(f, e.Bounds);
+            using var gras = new Font("Segoe UI Semibold", 9.5f);
+            TextRenderer.DrawText(e.Graphics, sec.ToUpperInvariant(), gras, r, Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             return;
         }
         var m = (Mods.Mod)liste.Items[e.Index];
-        using (var f = new SolidBrush(Bouton)) e.Graphics.FillRectangle(f, e.Bounds);
-        var couleur = !m.Actif ? Color.FromArgb(0x6b, 0x75, 0x80) : m.Lien != null ? Color.FromArgb(0x66, 0xc0, 0xff) : Color.White;
-        TextRenderer.DrawText(e.Graphics, m.Nom, Font, new Rectangle(r.X, r.Y, r.Width - 120, r.Height), couleur,
+        int rang = rangs.GetValueOrDefault(m);
+        using (var f = new SolidBrush(rang % 2 == 0 ? LigneB : LigneA)) e.Graphics.FillRectangle(f, e.Bounds);
+        var couleur = !m.Actif ? Color.FromArgb(0x5e, 0x68, 0x73) : m.Lien != null ? Lien : Color.White;
+        using var petite = new Font("Segoe UI", 8.5f);
+        TextRenderer.DrawText(e.Graphics, rang.ToString(), petite, new Rectangle(r.X, r.Y, 36, r.Height), Color.FromArgb(0x6b, 0x75, 0x80),
+            TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
+        TextRenderer.DrawText(e.Graphics, m.Nom, Font, new Rectangle(r.X + 48, r.Y, r.Width - 48 - 110, r.Height), couleur,
             TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(e.Graphics, m.Version, Font, r, Pale, TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics, m.Version, petite, r, !m.Actif ? Color.FromArgb(0x5e, 0x68, 0x73) : Pale,
+            TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
     }
 
     void ChercherCibles()
@@ -145,9 +211,11 @@ sealed class FenetreMods : FenetreSombre
                     if (domaine == null || !domaines.Contains(domaine, StringComparer.OrdinalIgnoreCase)) continue;
                     var exe = Path.Combine(instance, "ModOrganizer.exe");
                     if (!File.Exists(exe)) continue;
+                    var telechargements = Mods.ValeurMo2(ini.GetValueOrDefault("download_directory"));
+                    if (string.IsNullOrWhiteSpace(telechargements)) telechargements = Path.Combine(baseMo2, "downloads");
                     lesCibles.Add(new Cible($"Mod Organizer 2 — {Path.GetFileName(instance.TrimEnd('\\'))}",
-                        m => presents.Contains(m.ModId), m => Lancer(exe, m.Nxm),
-                        "Mod Organizer les ajoute à ses téléchargements (compte Nexus Premium : sans passer par le site), puis on les installe dans Mod Organizer."));
+                        m => presents.Contains(m.ModId), m => EnvoyerMo2(exe, telechargements, m),
+                        "Mod Organizer télécharge les mods un par un (compte Nexus Premium : sans passer par le site), puis on les installe dans Mod Organizer."));
                 }
                 catch { }
             }
@@ -180,7 +248,8 @@ sealed class FenetreMods : FenetreSombre
         else
         {
             cibles.Enabled = importer.Enabled = false;
-            etat.Text = source.Mods.Any(m => m.Nxm != null || m.Workshop != null)
+            puceImporter.Visible = pucePresents.Visible = puceSansLien.Visible = false;
+            explication.Text = source.Mods.Any(m => m.Nxm != null || m.Workshop != null)
                 ? "Aucun gestionnaire de mods installé pour ce jeu."
                 : "Mods sans lien de téléchargement : à retrouver par leur nom.";
         }
@@ -212,6 +281,31 @@ sealed class FenetreMods : FenetreSombre
         return (domaine, presents);
     }
 
+    // Mod Organizer 2.4 bloque à 0 octet un téléchargement reçu pendant qu'un autre est en cours (essais du 24/11 :
+    // seul = OK, deux à 0,7 s = le second reste « .unfinished » vide). Un mod à la fois : on attend son archive finie
+    // (nom contenant « -<modid>- », sans .unfinished), ou on passe au suivant s'il reste vide 45 s (10 min au plus).
+    readonly List<string> bloques = new();
+
+    async Task EnvoyerMo2(string exe, string telechargements, Mods.Mod m)
+    {
+        var debut = DateTime.Now.AddSeconds(-2);
+        await Lancer(exe, m.Nxm);
+        var motif = $"-{m.ModId}-";
+        var limite = DateTime.Now.AddMinutes(10);
+        DateTime vide = DateTime.Now;
+        while (DateTime.Now < limite && !IsDisposed)
+        {
+            await Task.Delay(1000);
+            FileInfo[] f;
+            try { f = new DirectoryInfo(telechargements).GetFiles($"*{motif}*").Where(x => x.LastWriteTime >= debut && !x.Name.EndsWith(".meta")).ToArray(); }
+            catch { continue; }
+            if (f.Any(x => !x.Name.EndsWith(".unfinished"))) return;                    // archive finie
+            if (f.Any(x => x.Length > 0)) { vide = DateTime.Now; continue; }             // en cours
+            if (DateTime.Now - vide > TimeSpan.FromSeconds(45)) break;                   // bloqué ou absent
+        }
+        bloques.Add(m.Nom);
+    }
+
     static async Task Lancer(string exe, string lien)
     {
         try { using var p = Process.Start(new ProcessStartInfo(exe) { ArgumentList = { lien }, UseShellExecute = false }); } catch { }
@@ -229,10 +323,14 @@ sealed class FenetreMods : FenetreSombre
         if (Choisie is not { } c) return;
         var a = AImporter(c);
         int avecLien = source.Mods.Count(m => c.Nom.StartsWith("Steam") ? m.Workshop != null : m.Nxm != null);
-        etat.ForeColor = Pale;
-        etat.Text = $"{a.Count} mod{(a.Count > 1 ? "s" : "")} à importer"
-            + (avecLien > a.Count ? $" ({avecLien - a.Count} déjà présents)" : "")
-            + (source.Mods.Count > avecLien ? $" · {source.Mods.Count - avecLien} sans lien de téléchargement" : "") + ".\n" + c.Explication;
+        int presents = avecLien - a.Count, sansLien = source.Mods.Count - avecLien;
+        puceImporter.Text = $"{a.Count} à importer";
+        pucePresents.Text = $"{presents} déjà présent{(presents > 1 ? "s" : "")}";
+        pucePresents.Visible = presents > 0;
+        puceSansLien.Text = $"{sansLien} sans lien";
+        puceSansLien.Visible = sansLien > 0;
+        explication.Text = c.Explication;
+        Message("", Texte);
         importer.Enabled = a.Count > 0 && !enCours;
     }
 
@@ -254,24 +352,27 @@ sealed class FenetreMods : FenetreSombre
             confirmer = true;
             importer.Text = $"Confirmer : {a.Count} mod{(a.Count > 1 ? "s" : "")}";
             Couleur(importer, Rouge);
-            etat.ForeColor = Texte;
-            etat.Text = $"Envoyer {a.Count} mod{(a.Count > 1 ? "s" : "")} à « {c.Nom} » ? {c.Explication}";
+            Message($"Envoyer {a.Count} mod{(a.Count > 1 ? "s" : "")} à « {c.Nom} » ? Un second clic lance l'envoi.", Texte);
             return;
         }
         Desarmer();
         enCours = true;
         importer.Enabled = cibles.Enabled = false;
         int n = 0;
+        bloques.Clear();
         foreach (var m in a)
         {
             if (IsDisposed) return;
-            etat.ForeColor = Pale;
-            etat.Text = $"Import {++n}/{a.Count} : {m.Nom}";
+            Message($"Import {++n}/{a.Count} : {m.Nom}", Pale);
             await c.Importer(m);
         }
         enCours = false;
-        etat.ForeColor = Texte;
-        etat.Text = $"✓ {a.Count} mod{(a.Count > 1 ? "s" : "")} envoyé{(a.Count > 1 ? "s" : "")} à « {c.Nom} ». {c.Explication}";
+        int ok = a.Count - bloques.Count;
+        if (bloques.Count == 0)
+            Message($"✓ {ok} mod{(ok > 1 ? "s" : "")} envoyé{(ok > 1 ? "s" : "")} à « {c.Nom} ».", Texte);
+        else
+            Message($"✓ {ok} téléchargé{(ok > 1 ? "s" : "")} · ⚠ {bloques.Count} sans téléchargement (à relancer dans Mod Organizer) : "
+                + string.Join(", ", bloques.Take(8)) + (bloques.Count > 8 ? "…" : ""), Rouge);
         cibles.Enabled = true;
     }
 }
