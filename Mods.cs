@@ -12,10 +12,31 @@ namespace Steem;
 // Écrit mods.json (données) et mods.html (page à ouvrir, liens cliquables) dans le dossier de la sauvegarde.
 static class Mods
 {
-    public sealed record Mod(string Nom, string Version, string Lien, bool Actif, string Section);
+    // Domaine / ModId / Fichier : mod Nexus (lien nxm:// pour le réimporter) ; Workshop : numéro d'objet du Workshop.
+    public sealed record Mod(string Nom, string Version, string Lien, bool Actif, string Section,
+                             string Domaine = null, long ModId = 0, long Fichier = 0, string Workshop = null)
+    {
+        public string Nxm => Domaine != null && ModId > 0 && Fichier > 0 ? $"nxm://{Domaine}/mods/{ModId}/files/{Fichier}" : null;
+    }
     public sealed record Source(string Titre, string Detail, List<Mod> Mods);
 
     public const string FichierJson = "mods.json", FichierPage = "mods.html";
+
+    // Relit la liste d'une sauvegarde (fenêtre d'une source, import).
+    public static List<Source> Lire(string dossierProfil)
+    {
+        var res = new List<Source>();
+        try
+        {
+            var j = JsonNode.Parse(File.ReadAllText(Path.Combine(dossierProfil, FichierJson)));
+            foreach (var s in j?["sources"]?.AsArray() ?? [])
+                res.Add(new Source((string)s["titre"], (string)s["detail"], (s["mods"]?.AsArray() ?? []).Select(m => new Mod(
+                    (string)m["nom"], (string)m["version"], (string)m["lien"], (bool?)m["actif"] ?? true, (string)m["section"],
+                    (string)m["domaine"], (long?)m["modid"] ?? 0, (long?)m["fichier"] ?? 0, (string)m["workshop"])).ToList()));
+        }
+        catch { }
+        return res;
+    }
 
     // Nombre de mods d'une sauvegarde (0 : pas de liste).
     public static int Compter(string dossierProfil)
@@ -43,6 +64,7 @@ static class Mods
                 ["mods"] = new JsonArray(s.Mods.Select(m => (JsonNode)new JsonObject
                 {
                     ["nom"] = m.Nom, ["version"] = m.Version, ["lien"] = m.Lien, ["actif"] = m.Actif, ["section"] = m.Section,
+                    ["domaine"] = m.Domaine, ["modid"] = m.ModId, ["fichier"] = m.Fichier, ["workshop"] = m.Workshop,
                 }).ToArray()),
             }).ToArray()),
         };
@@ -155,7 +177,7 @@ static class Mods
         catch { }   // hors ligne : les numéros suffisent à retrouver les mods
 
         var mods = ids.Select(id => new Mod(titres.GetValueOrDefault(id, $"Objet {id}"), "",
-            $"https://steamcommunity.com/sharedfiles/filedetails/?id={id}", true, null))
+            $"https://steamcommunity.com/sharedfiles/filedetails/?id={id}", true, null, Workshop: id))
             .OrderBy(m => m.Nom, StringComparer.CurrentCultureIgnoreCase).ToList();
         return new Source("Workshop Steam", "Abonnements installés : Steam les retélécharge tant que l'abonnement est gardé.", mods);
     }
@@ -173,7 +195,7 @@ static class Mods
     };
 
     // Nom court de Mod Organizer (meta.ini) → domaine Nexus.
-    static readonly Dictionary<string, string> DomainesNexus = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly Dictionary<string, string> DomainesNexus = new(StringComparer.OrdinalIgnoreCase)
     {
         ["SkyrimSE"] = "skyrimspecialedition", ["Skyrim"] = "skyrim", ["SkyrimVR"] = "skyrimspecialedition",
         ["Fallout4"] = "fallout4", ["Fallout4VR"] = "fallout4", ["FalloutNV"] = "newvegas", ["Fallout3"] = "fallout3",
@@ -182,7 +204,7 @@ static class Mods
         ["StardewValley"] = "stardewvalley", ["Witcher3"] = "witcher3",
     };
 
-    static Dictionary<string, string> LireIni(string fichier)
+    internal static Dictionary<string, string> LireIni(string fichier)
     {
         var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var l in File.ReadLines(fichier))
@@ -194,14 +216,14 @@ static class Mods
     }
 
     // @ByteArray(F:\\Jeu) → F:\Jeu
-    static string ValeurMo2(string v)
+    internal static string ValeurMo2(string v)
     {
         if (v == null) return null;
         if (v.StartsWith("@ByteArray(") && v.EndsWith(")")) v = v[11..^1];
         return v.Replace(@"\\", @"\");
     }
 
-    static IEnumerable<string> InstancesMo2()
+    internal static IEnumerable<string> InstancesMo2()
     {
         var racine = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ModOrganizer");
         var vues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -248,7 +270,8 @@ static class Mods
                 var nom = ligne[1..];
                 if (etat == '*') continue;                        // fichiers du jeu ou DLC, pas des mods
                 if (nom.EndsWith("_separator")) { section = nom[..^"_separator".Length]; continue; }
-                string version = "", lien = null;
+                string version = "", lien = null, domaine = null;
+                long modid = 0, fichier = 0;
                 try
                 {
                     var meta = Path.Combine(baseMo2, "mods", nom, "meta.ini");
@@ -257,16 +280,19 @@ static class Mods
                         var m = LireIni(meta);
                         version = m.GetValueOrDefault("version", "");
                         var url = m.GetValueOrDefault("url", "");
-                        if (url.Length > 0 && m.GetValueOrDefault("hasCustomURL", "false") == "true") lien = url;
-                        else if (int.TryParse(m.GetValueOrDefault("modid", "0"), out var modid) && modid > 0)
+                        long.TryParse(m.GetValueOrDefault("modid", "0"), out modid);
+                        long.TryParse(m.GetValueOrDefault(@"1\fileid", "0"), out fichier);   // [installedFiles] : le fichier Nexus installé
+                        if (modid > 0)
                         {
                             var g = m.GetValueOrDefault("gameName", "");
-                            lien = $"https://www.nexusmods.com/{DomainesNexus.GetValueOrDefault(g, g.ToLowerInvariant())}/mods/{modid}";
+                            domaine = DomainesNexus.GetValueOrDefault(g, g.ToLowerInvariant());
                         }
+                        if (url.Length > 0 && m.GetValueOrDefault("hasCustomURL", "false") == "true") lien = url;
+                        else if (modid > 0) lien = $"https://www.nexusmods.com/{domaine}/mods/{modid}";
                     }
                 }
                 catch { }
-                mods.Add(new Mod(nom, version, lien, etat == '+', section));
+                mods.Add(new Mod(nom, version, lien, etat == '+', section, domaine, modid, fichier));
             }
             yield return new Source($"Mod Organizer 2 — {Path.GetFileName(instance.TrimEnd('\\'))}",
                 $"Profil « {profil} », dans l'ordre de Mod Organizer. Dossier : {instance}", mods);
@@ -322,7 +348,9 @@ static class Mods
             var nomMod = (string)l?["mod_name"] ?? n;
             if (!vus.Add(lien ?? Cle(nomMod))) continue;   // même mod Nexus sous deux noms
             bool actif = new[] { n, (string)l?["file_name"], nomMod }.Any(x => x != null && actifsCles.Contains(Cle(x)));
-            mods.Add(new Mod(nomMod, (string)l?["version"] ?? "", lien, actif, null));
+            long fichierDmm = (long?)l?["file_id"] ?? 0;
+            mods.Add(new Mod(nomMod, (string)l?["version"] ?? "", lien, actif, null,
+                lien != null ? (string)l["game"] : null, lien != null ? (long?)l["mod_id"] ?? 0 : 0, fichierDmm));
         }
         yield return new Source("DMM", $"Gestionnaire de mods : {dossier}", mods);
     }
@@ -343,21 +371,24 @@ static class Mods
           .Append("</style></head><body>");
         sb.Append("<h1>Mods de « ").Append(H(jeu)).Append(" »</h1><div class=\"pale\">Liste du ")
           .Append(DateTime.Now.ToString("dd/MM/yyyy HH:mm")).Append(" · ").Append(total).Append(" mods · les mods désactivés sont grisés</div>");
+        int numero = 0;
         foreach (var s in sources)
         {
             int actifs = s.Mods.Count(m => m.Actif);
-            sb.Append("<h2>").Append(H(s.Titre)).Append("</h2><div class=\"pale\">").Append(H(s.Detail)).Append(" · ")
+            sb.Append("<h2 id=\"s").Append(numero++).Append("\">").Append(H(s.Titre)).Append("</h2><div class=\"pale\">").Append(H(s.Detail)).Append(" · ")
               .Append(actifs).Append(" actifs sur ").Append(s.Mods.Count).Append("</div><table>");
             string section = null; int n = 0;
             foreach (var m in s.Mods)
             {
                 if (m.Section != section && m.Section != null) sb.Append("<tr class=\"sec\"><td colspan=\"4\">").Append(H(m.Section)).Append("</td></tr>");
                 section = m.Section;
-                sb.Append(m.Actif ? "<tr>" : "<tr class=\"off\">").Append("<td class=\"n\">").Append(++n).Append("</td><td>").Append(H(m.Nom))
-                  .Append("</td><td class=\"v\">").Append(H(m.Version)).Append("</td><td>");
-                if (m.Lien != null) sb.Append("<a href=\"").Append(H(m.Lien)).Append("\" target=\"_blank\">")
-                    .Append(m.Lien.Contains("nexusmods") ? "Nexus" : m.Lien.Contains("steamcommunity") ? "Workshop" : "Lien").Append("</a>");
-                sb.Append("</td></tr>");
+                // Nom du mod = lien vers sa dernière adresse connue au moment de la sauvegarde (Kev 24/11).
+                sb.Append(m.Actif ? "<tr>" : "<tr class=\"off\">").Append("<td class=\"n\">").Append(++n).Append("</td><td>");
+                if (m.Lien != null) sb.Append("<a href=\"").Append(H(m.Lien)).Append("\" target=\"_blank\">").Append(H(m.Nom)).Append("</a>");
+                else sb.Append(H(m.Nom));
+                sb.Append("</td><td class=\"v\">").Append(H(m.Version)).Append("</td><td class=\"v\">")
+                  .Append(m.Lien == null ? "" : m.Lien.Contains("nexusmods") ? "Nexus" : m.Lien.Contains("steamcommunity") ? "Workshop" : "Web")
+                  .Append("</td></tr>");
             }
             sb.Append("</table>");
         }

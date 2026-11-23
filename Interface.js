@@ -54,15 +54,37 @@
 
   // Infobulle de Steem (0.15.6) : celle de Steam (attribut title) coupait le texte dans un cadre trop petit.
   const BULLE = 'steem-bulle';
-  const cacherBulle = doc => { const x = doc.getElementById(BULLE); if (x) x.remove(); };
+  // 0.16.1 : la bulle reste ouverte sous la souris ; les sources de la liste des mods y sont cliquables.
+  let delaiBulle = 0;
+  const cacherBulle = doc => { clearTimeout(delaiBulle); const x = doc.getElementById(BULLE); if (x) x.remove(); };
+  const cacherBientot = doc => { clearTimeout(delaiBulle); delaiBulle = setTimeout(() => cacherBulle(doc), 250); };
   const bulle = (doc, b) => {
     cacherBulle(doc);
     const x = doc.createElement('div');
     x.id = BULLE;
-    x.textContent = b.dataset.info || '';
-    x.style.cssText = 'position:fixed;z-index:100000;pointer-events:none;white-space:pre;max-width:none;'
+    x.style.cssText = 'position:fixed;z-index:100000;white-space:pre;max-width:none;'
       + 'background:#3d4450;color:#dcdedf;font-size:12px;line-height:1.5;padding:6px 10px;border-radius:3px;'
       + 'box-shadow:0 2px 8px rgba(0,0,0,.6)';
+    const texte = t => { const s = doc.createElement('div'); s.textContent = t; x.appendChild(s); };
+    texte(b.dataset.info || '');
+    for (const s of b._sources || []) {
+      const a = doc.createElement('div');
+      a.textContent = '      › ' + s.titre + ' (' + s.n + ')';
+      a.title = '';
+      a.style.cssText = 'color:#1a9fff;cursor:pointer';
+      a.addEventListener('mouseenter', () => { a.style.textDecoration = 'underline'; });
+      a.addEventListener('mouseleave', () => { a.style.textDecoration = 'none'; });
+      a.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation();
+        cacherBulle(doc);
+        const ov = appStore.GetAppOverviewByAppID(Number(b.dataset.appid));
+        window.steemAppel(JSON.stringify({ action: 'mods', appid: Number(b.dataset.appid), nom: ov ? ov.display_name : '', source: s.i }));
+      });
+      x.appendChild(a);
+    }
+    if (b.dataset.fin) texte(b.dataset.fin);
+    x.addEventListener('mouseenter', () => clearTimeout(delaiBulle));
+    x.addEventListener('mouseleave', () => cacherBientot(doc));
     doc.body.appendChild(x);
     const r = b.getBoundingClientRect(), w = x.offsetWidth, h = x.offsetHeight, vw = doc.documentElement.clientWidth;
     x.style.left = Math.max(4, Math.min(r.right - w, vw - w - 4)) + 'px';
@@ -76,7 +98,7 @@
     b.dataset.v = VERSION;   // boutons d'une version précédente de Steem : refaits
     b.dataset.info = d.titre;
     b.addEventListener('mouseenter', () => bulle(doc, b));
-    b.addEventListener('mouseleave', () => cacherBulle(doc));
+    b.addEventListener('mouseleave', () => cacherBientot(doc));
     b.setAttribute('role', 'button');
     b.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;'
       + (d.texte || d.led ? 'width:auto;padding:0 12px;font-size:13px;font-weight:400;white-space:nowrap' : '');
@@ -114,11 +136,13 @@
     // Compte rendu de la dernière sauvegarde : ✅ + nombre, ou « — aucun » (Kev 24/11).
     const ligne = (n, texte) => (n > 0 ? '✅ ' + texte + ' (' + n + ')' : '—  ' + texte + ' : aucun');
     const detail = r ? '\n' + [ligne(r.parties, 'Sauvegardes de partie'), ligne(r.binds, 'Binds'),
-      ligne(r.configs, 'Configs'), ligne(r.mods, 'Liste des mods')].join('\n')
-      + (r.autres > 0 ? '\n✅ Autres fichiers (' + r.autres + ')' : '') : '';
+      ligne(r.configs, 'Configs')].concat(r.autres > 0 ? ['✅ Autres fichiers (' + r.autres + ')'] : [])
+      .concat([ligne(r.mods, 'Liste des mods')]).join('\n') : '';
     b.dataset.info = 'Sauvegarder ou restaurer les fichiers du jeu (Steem)\n\n'
-      + 'Dernière sauvegarde : ' + (t ? date(t) + ' ' + heure(t) : 'aucune') + detail + '\n\n'
-      + 'Dernier lancement : ' + (lance ? date(lance) + ' ' + heure(lance) : 'jamais');
+      + 'Dernière sauvegarde : ' + (t ? date(t) + ' ' + heure(t) : 'aucune') + detail;
+    // Sources de la liste (Workshop, Mod Organizer, DMM…), cliquables sous « Liste des mods ».
+    b._sources = r && Array.isArray(r.sources) ? r.sources.map((s, i) => ({ titre: s.titre, n: s.n, i })) : [];
+    b.dataset.fin = '\nDernier lancement : ' + (lance ? date(lance) + ' ' + heure(lance) : 'jamais');
   };
 
   const cycle = () => {
@@ -128,7 +152,7 @@
       const popup = g_PopupManager.GetExistingPopup('SP Desktop_uid0');
       const doc = popup && popup.m_popup && popup.m_popup.document;
       if (!doc) return;
-      if (doc.getElementById(BULLE) && !doc.querySelector('.' + CLASSE + ':hover')) cacherBulle(doc);  // bouton retiré sous la souris
+      if (doc.getElementById(BULLE) && !doc.querySelector('.' + CLASSE + ':hover, #' + BULLE + ':hover')) cacherBientot(doc);  // bouton retiré sous la souris
       const chemin = (MainWindowBrowserManager.m_lastLocation || {}).pathname || '';
       const m = /^\/library\/app\/(\d+)/.exec(chemin);
       const appid = m ? Number(m[1]) : 0;

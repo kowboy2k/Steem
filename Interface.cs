@@ -117,6 +117,13 @@ sealed class InterfaceSteam : IDisposable
                 string nom = (string)appel["nom"] ?? "";
                 if (action == "desinstaller") ui.Post(_ => Ouvrir(() => new FenetreDesinstaller(this, reglages, appid, nom)), null);
                 else if (action == "sauvegardes") ui.Post(_ => Ouvrir(() => new FenetreSauvegardes(this, reglages, appid, nom)), null);
+                else if (action == "mods")
+                {
+                    // Source cliquée dans l'infobulle : liste de la dernière sauvegarde du jeu (0.16.1).
+                    int numero = (int?)appel["source"] ?? 0;
+                    var dossier = Ludusavi.Dernieres(reglages).GetValueOrDefault(appid)?["dossier"]?.GetValue<string>();
+                    if (dossier != null) ui.Post(_ => Ouvrir(() => new FenetreMods(this, appid, nom, dossier, numero)), null);
+                }
             }
             catch { }
         }

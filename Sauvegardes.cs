@@ -150,6 +150,7 @@ static class Ludusavi
                     }
                     catch { }
                     o["t"] = new DateTimeOffset(dernier.CreationTime).ToUnixTimeSeconds();
+                    o["dossier"] = dernier.FullName;
                     res[appid] = o;
                 }
                 catch { }
@@ -225,7 +226,7 @@ static class Ludusavi
         else
         {
             try { File.WriteAllText(Path.Combine(dossierJeu, FichierAppid), appid.ToString()); } catch { }
-            try { File.WriteAllText(Path.Combine(dossier, FichierResume), Resume(res?.Chemins ?? [], mods).ToJsonString()); } catch { }
+            try { File.WriteAllText(Path.Combine(dossier, FichierResume), Resume(res?.Chemins ?? [], mods, dossier).ToJsonString()); } catch { }
         }
         return b;
     }
@@ -247,8 +248,10 @@ static class Ludusavi
     static readonly Regex Parties = new(@"save|\.(sav|ess|fos|sl2)$", RegexOptions.IgnoreCase);
     static readonly Regex Configs = new(@"config|setting|option|pref|\.(ini|cfg|conf|json|xml|ya?ml|toml)$", RegexOptions.IgnoreCase);
 
-    static JsonObject Resume(string[] chemins, int mods)
+    static JsonObject Resume(string[] chemins, int mods, string dossier)
     {
+        // Sources de la liste des mods (infobulle : chacune cliquable, ouvre sa liste et l'import).
+        var sources = new JsonArray(Steem.Mods.Lire(dossier).Select(s => (JsonNode)new JsonObject { ["titre"] = s.Titre, ["n"] = s.Mods.Count }).ToArray());
         int b = 0, p = 0, c = 0, a = 0;
         foreach (var x in chemins)
         {
@@ -258,7 +261,7 @@ static class Ludusavi
             else if (Configs.IsMatch(f)) c++;
             else a++;
         }
-        return new JsonObject { ["parties"] = p, ["binds"] = b, ["configs"] = c, ["autres"] = a, ["mods"] = mods };
+        return new JsonObject { ["parties"] = p, ["binds"] = b, ["configs"] = c, ["autres"] = a, ["mods"] = mods, ["sources"] = sources, ["dossier"] = dossier };
     }
 
     public static async Task<Resultat> Sauvegarder(string exe, string jeu, string dossier, int appid)
