@@ -10,6 +10,8 @@ Steam a enfin le droit à **une fenêtre inifiée.**
 - 🟦 Ton statut Steam d'un simple coup d'œil.
 - 🗑️ Sur la page d'un jeu : « Désinstaller » propose d'abord de sauvegarder ses fichiers (parties, configs, binds).
 - 💾 La disquette sauvegarde ou restaure ces fichiers ; sa pastille dit si la sauvegarde est à jour.
+- 🧩 Chaque sauvegarde garde la liste des mods (Nexus, Workshop, Mod Organizer, dossiers du jeu), cliquable, et peut les réimporter dans un gestionnaire installé (téléchargement direct avec une clé API Nexus Premium).
+- 📏 Place occupée et disque du jeu, à côté de « Désinstaller ».
 - ⚙️ Réglages dans l'icône près de l'horloge.
 
 **Installer :** [Releases](../../releases) → `Steem_Setup_….exe` (complet, ~72 Mo) ou `…_leger.exe` (~11 Mo, .NET 8 requis).
@@ -39,6 +41,8 @@ Steem docks it to Steam's right edge: **all in one window.**
 - 🟦 Your Steam status at a glance.
 - 🗑️ On a game's page: "Uninstall" first offers to back up its files (saves, configs, binds).
 - 💾 The floppy button backs up or restores those files; its dot shows whether the backup is up to date.
+- 🧩 Each backup keeps the list of mods (Nexus, Workshop, Mod Organizer, game folders), clickable, and can re-import them into an installed mod manager (direct download with a Nexus Premium API key).
+- 📏 Disk space used and drive, next to "Uninstall".
 - ⚙️ Settings in the tray icon (interface in French for now).
 
 **Install:** [Releases](../../releases) → `Steem_Setup_….exe` (full, ~72 MB) or `…_leger.exe` (~11 MB, needs .NET 8).
@@ -57,6 +61,8 @@ Steem dockt sie an den rechten Rand von Steam: **ein Fenster.**
 - 🟦 Dein Steam-Status auf einen Blick.
 - 🗑️ Auf der Spielseite: „Deinstallieren“ bietet zuerst an, die Spieldateien zu sichern (Spielstände, Configs, Binds).
 - 💾 Die Diskette sichert oder stellt diese Dateien wieder her; ihr Punkt zeigt, ob die Sicherung aktuell ist.
+- 🧩 Jede Sicherung behält die Mod-Liste (Nexus, Workshop, Mod Organizer, Spielordner), anklickbar, und kann sie in einen installierten Mod-Manager zurückholen (direkter Download mit Nexus-Premium-API-Schlüssel).
+- 📏 Belegter Speicher und Laufwerk, neben „Deinstallieren“.
 - ⚙️ Einstellungen im Symbol neben der Uhr (Oberfläche vorerst auf Französisch).
 
 **Installieren:** [Releases](../../releases) → `Steem_Setup_….exe` (komplett, ~72 MB) oder `…_leger.exe` (~11 MB, .NET 8 nötig).
