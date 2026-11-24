@@ -198,7 +198,7 @@ sealed class FenetreMods : FenetreSombre
         garder.Click += async (_, _) => await EnregistrerCle();
         ligneCle.Controls.Add(garder);
         var ou = new LinkLabel { Text = "Où la trouver ?", AutoSize = true, LinkColor = Accent, ActiveLinkColor = Accent, Margin = new Padding(0, 5, 0, 0) };
-        ou.LinkClicked += (_, _) => Navigateur.Ouvrir("https://www.nexusmods.com/users/myaccount?tab=api%20access");
+        ou.LinkClicked += (_, _) => Navigateur.Ouvrir("https://next.nexusmods.com/settings/api-keys");
         ligneCle.Controls.Add(ou);
         bloc.Controls.Add(ligneCle);
         ligneCompte = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 10), BackColor = Panneau, Visible = false };
