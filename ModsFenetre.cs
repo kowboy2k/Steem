@@ -32,7 +32,13 @@ static class Navigateur
 // Workshop, Mod Organizer 2 ou le gestionnaire des liens nxm:// pour Nexus). Seuls les mods absents sont envoyés.
 sealed class FenetreMods : FenetreSombre
 {
-    sealed record Cible(string Nom, Func<Mods.Mod, bool> Present, Func<Mods.Mod, Task> Importer, string Explication);
+    sealed record Cible(string Nom, Func<Mods.Mod, bool> Present, Func<Mods.Mod, Task> Importer, string ExplicationFixe)
+    {
+        public bool Mo2 { get; init; }
+        public string Explication => !Mo2 ? ExplicationFixe : Nexus.Cle() != null
+            ? "Steem télécharge chaque mod depuis Nexus avec ta clé API (Premium) et le dépose dans les téléchargements de Mod Organizer : il n'y a plus qu'à l'installer."
+            : "Sans clé API Nexus, les mods passent par des liens nxm:// envoyés à Mod Organizer, un par un. Mod Organizer 2.4 en laisse une partie bloquée à 0 octet.";
+    }
 
     readonly InterfaceSteam steam;
     readonly int appid;
@@ -50,7 +56,54 @@ sealed class FenetreMods : FenetreSombre
                           LigneB = Color.FromArgb(0x29, 0x32, 0x3e), Section = Color.FromArgb(0x37, 0x41, 0x50),
                           Vert = Color.FromArgb(0x2e, 0x6b, 0x3a), Lien = Color.FromArgb(0x66, 0xc0, 0xff);
     readonly Dictionary<Mods.Mod, int> rangs = new();
-    readonly Label puceImporter, pucePresents, puceSansLien, explication;
+    readonly Label puceImporter, pucePresents, puceSansLien, explication, compte;
+    readonly FlowLayoutPanel ligneCle, ligneCompte;
+    readonly TextBox saisieCle;
+    readonly CancellationTokenSource fin = new();
+    Nexus.ErreurNexus arret;
+    int courant, totalImport;
+
+    protected override void OnFormClosed(FormClosedEventArgs e) { fin.Cancel(); base.OnFormClosed(e); }
+
+    // Ligne de la clé : saisie si aucune clé, sinon compte connecté (seulement pour Mod Organizer).
+    void AfficherCle()
+    {
+        bool mo2 = Choisie is { Mo2: true };
+        bool cle = Nexus.Cle() != null;
+        ligneCle.Visible = mo2 && !cle;
+        ligneCompte.Visible = mo2 && cle;
+        if (mo2 && cle && string.IsNullOrEmpty(compte.Text)) compte.Text = "Nexus : clé API enregistrée · téléchargement direct par Steem";
+    }
+
+    async Task EnregistrerCle()
+    {
+        var cle = saisieCle.Text.Trim();
+        if (cle.Length < 10) { Message("Colle la clé API personnelle de ton compte Nexus.", Rouge); return; }
+        Message("Vérification de la clé auprès de Nexus…", Pale);
+        try
+        {
+            var c = await Nexus.Valider(cle, fin.Token);
+            Nexus.Enregistrer(cle);
+            saisieCle.Clear();
+            compte.Text = $"Nexus : {c.Nom} ({(c.Premium ? "Premium" : "compte gratuit : téléchargement direct refusé par Nexus")})";
+            compte.ForeColor = c.Premium ? Texte : Rouge;
+            Message("", Texte);
+            AfficherCle();
+            Compter();
+        }
+        catch (Exception ex) { Message("Clé non enregistrée : " + ex.Message, Rouge); }
+    }
+
+    async Task TelechargerDirect(string cle, Mods.Mod m, string telechargements, string jeuMo2)
+    {
+        if (arret != null) { bloques.Add(m.Nom); return; }
+        var p = new Progress<(long recus, long total)>(x =>
+            Message($"Import {courant}/{totalImport} : {m.Nom} — {Ludusavi.Taille(x.recus)}" + (x.total > 0 ? $" sur {Ludusavi.Taille(x.total)}" : ""), Pale));
+        try { await Nexus.Telecharger(cle, m, telechargements, jeuMo2 ?? "", p, fin.Token); }
+        catch (Nexus.ErreurNexus e) { bloques.Add(m.Nom); if (e.Arret) arret = e; }
+        catch (OperationCanceledException) { bloques.Add(m.Nom); }
+        catch (Exception e) { bloques.Add($"{m.Nom} ({e.Message})"); }
+    }
 
     // Mise en page (0.16.3, Kev 24/11 : « plus agréable à lire ») : en-tête jeu / plateforme / infos, liste numérotée
     // à lignes alternées, puis un bloc « Importer » à part avec des pastilles de comptes.
@@ -134,6 +187,28 @@ sealed class FenetreMods : FenetreSombre
             Width = Largeur - 28, Margin = new Padding(0, 0, 0, 10),
         };
         bloc.Controls.Add(cibles);
+
+        // Clé API Nexus (Mod Organizer) : saisie par l'utilisateur, gardée dans le Gestionnaire d'identification de Windows.
+        ligneCle = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 10), BackColor = Panneau, Visible = false };
+        ligneCle.Controls.Add(new Label { Text = "Clé API Nexus :", AutoSize = true, ForeColor = Texte, Margin = new Padding(0, 5, 8, 0) });
+        saisieCle = new TextBox { Width = 250, UseSystemPasswordChar = true, BackColor = Bouton, ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 1, 8, 0) };
+        ligneCle.Controls.Add(saisieCle);
+        var garder = new Button { Text = "Enregistrer", AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = Bouton, ForeColor = Color.White, Margin = new Padding(0, 0, 8, 0), UseVisualStyleBackColor = false };
+        garder.FlatAppearance.BorderSize = 0;
+        garder.Click += async (_, _) => await EnregistrerCle();
+        ligneCle.Controls.Add(garder);
+        var ou = new LinkLabel { Text = "Où la trouver ?", AutoSize = true, LinkColor = Accent, ActiveLinkColor = Accent, Margin = new Padding(0, 5, 0, 0) };
+        ou.LinkClicked += (_, _) => Navigateur.Ouvrir("https://www.nexusmods.com/users/myaccount?tab=api%20access");
+        ligneCle.Controls.Add(ou);
+        bloc.Controls.Add(ligneCle);
+        ligneCompte = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 10), BackColor = Panneau, Visible = false };
+        compte = new Label { AutoSize = true, ForeColor = Texte, Margin = new Padding(0, 0, 10, 0) };
+        ligneCompte.Controls.Add(compte);
+        var changer = new LinkLabel { Text = "Changer la clé", AutoSize = true, LinkColor = Accent, ActiveLinkColor = Accent, Margin = new Padding(0) };
+        changer.LinkClicked += (_, _) => { ligneCompte.Visible = false; ligneCle.Visible = true; saisieCle.Focus(); };
+        ligneCompte.Controls.Add(changer);
+        bloc.Controls.Add(ligneCompte);
+
         var puces = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 8), BackColor = Panneau };
         Label Puce(Color fond) { var l = new Label { AutoSize = true, BackColor = fond, ForeColor = Color.White, Padding = new Padding(8, 3, 8, 3), Margin = new Padding(0, 0, 8, 0) }; puces.Controls.Add(l); return l; }
         puceImporter = Puce(Accent);
@@ -207,15 +282,17 @@ sealed class FenetreMods : FenetreSombre
                     var ini = Mods.LireIni(Path.Combine(instance, "ModOrganizer.ini"));
                     var baseMo2 = Mods.ValeurMo2(ini.GetValueOrDefault("base_directory"));
                     if (string.IsNullOrWhiteSpace(baseMo2)) baseMo2 = instance;
-                    var (domaine, presents) = ModsMo2(Path.Combine(baseMo2, "mods"));
+                    var (domaine, presents, jeuMo2) = ModsMo2(Path.Combine(baseMo2, "mods"));
                     if (domaine == null || !domaines.Contains(domaine, StringComparer.OrdinalIgnoreCase)) continue;
                     var exe = Path.Combine(instance, "ModOrganizer.exe");
                     if (!File.Exists(exe)) continue;
                     var telechargements = Mods.ValeurMo2(ini.GetValueOrDefault("download_directory"));
                     if (string.IsNullOrWhiteSpace(telechargements)) telechargements = Path.Combine(baseMo2, "downloads");
                     lesCibles.Add(new Cible($"Mod Organizer 2 — {Path.GetFileName(instance.TrimEnd('\\'))}",
-                        m => presents.Contains(m.ModId), m => EnvoyerMo2(exe, telechargements, m),
-                        "Mod Organizer télécharge les mods un par un (compte Nexus Premium : sans passer par le site), puis on les installe dans Mod Organizer."));
+                        m => presents.Contains(m.ModId),
+                        // Clé API Nexus enregistrée : Steem télécharge lui-même (0.16.5) ; sinon liens nxm:// à Mod Organizer.
+                        m => Nexus.Cle() is { } cle ? TelechargerDirect(cle, m, telechargements, jeuMo2) : EnvoyerMo2(exe, telechargements, m),
+                        null) { Mo2 = true });
                 }
                 catch { }
             }
@@ -256,11 +333,11 @@ sealed class FenetreMods : FenetreSombre
     }
 
     // Mods déjà dans une instance de Mod Organizer : numéros Nexus, et le domaine Nexus de l'instance.
-    static (string domaine, HashSet<long> presents) ModsMo2(string dossierMods)
+    static (string domaine, HashSet<long> presents, string jeuMo2) ModsMo2(string dossierMods)
     {
-        string domaine = null;
+        string domaine = null, jeuMo2 = null;
         var presents = new HashSet<long>();
-        if (!Directory.Exists(dossierMods)) return (null, presents);
+        if (!Directory.Exists(dossierMods)) return (null, presents, null);
         foreach (var d in Directory.GetDirectories(dossierMods))
         {
             var meta = Path.Combine(d, "meta.ini");
@@ -274,11 +351,12 @@ sealed class FenetreMods : FenetreSombre
                 {
                     var g = m.GetValueOrDefault("gameName", "");
                     domaine = Mods.DomainesNexus.GetValueOrDefault(g, g.ToLowerInvariant());
+                    jeuMo2 = g;
                 }
             }
             catch { }
         }
-        return (domaine, presents);
+        return (domaine, presents, jeuMo2);
     }
 
     // Mod Organizer 2.4 bloque à 0 octet un téléchargement reçu pendant qu'un autre est en cours (essais du 24/11 :
@@ -331,6 +409,7 @@ sealed class FenetreMods : FenetreSombre
         puceSansLien.Visible = sansLien > 0;
         explication.Text = c.Explication;
         Message("", Texte);
+        AfficherCle();
         importer.Enabled = a.Count > 0 && !enCours;
     }
 
@@ -360,15 +439,21 @@ sealed class FenetreMods : FenetreSombre
         importer.Enabled = cibles.Enabled = false;
         int n = 0;
         bloques.Clear();
+        arret = null;
+        totalImport = a.Count;
         foreach (var m in a)
         {
             if (IsDisposed) return;
-            Message($"Import {++n}/{a.Count} : {m.Nom}", Pale);
+            courant = ++n;
+            Message($"Import {n}/{a.Count} : {m.Nom}", Pale);
             await c.Importer(m);
         }
+        if (IsDisposed) return;
         enCours = false;
         int ok = a.Count - bloques.Count;
-        if (bloques.Count == 0)
+        if (arret != null)
+            Message($"✓ {ok} téléchargé{(ok > 1 ? "s" : "")} · ⚠ arrêt : {arret.Message} ({bloques.Count} non téléchargé{(bloques.Count > 1 ? "s" : "")})", Rouge);
+        else if (bloques.Count == 0)
             Message($"✓ {ok} mod{(ok > 1 ? "s" : "")} envoyé{(ok > 1 ? "s" : "")} à « {c.Nom} ».", Texte);
         else
             Message($"✓ {ok} téléchargé{(ok > 1 ? "s" : "")} · ⚠ {bloques.Count} sans téléchargement (à relancer dans Mod Organizer) : "
