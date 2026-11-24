@@ -242,7 +242,7 @@ static class Mods
             foreach (var d in Directory.GetDirectories(racine))
                 if (File.Exists(Path.Combine(d, "ModOrganizer.ini")) && vues.Add(d)) yield return d;
         // Instances ouvertes, puis instances portables non déclarées à 1 ou 2 niveaux des disques
-        // (ex. F:\Skyrim V2000, ouverte par Kev le 24/11 et inconnue des deux listes ci-dessus).
+        // (ex. une instance portable jamais déclarée, inconnue des deux listes ci-dessus, 24/11).
         foreach (var p in System.Diagnostics.Process.GetProcessesByName("ModOrganizer"))
         {
             string d = null;
