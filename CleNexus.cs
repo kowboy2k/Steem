@@ -16,11 +16,14 @@ sealed class FenetreCleNexus : FenetreSombre
         Paragraphe("1.  « Ouvrir la page Nexus » ci-dessous (connecté à ton compte).\n"
                  + "2.  Tout en bas, « Personal API Key » : copie la clé (« Request an API Key » si elle n'existe pas encore).\n"
                  + "3.  Colle-la ici, puis « Enregistrer ».", Pale);
+        var invite = Paragraphe("Colle ta clé ici (Ctrl+V) :", Color.White);
+        invite.Margin = new Padding(0, 12, 0, 4);
         saisie = Ajouter(new TextBox
         {
-            Width = Largeur, UseSystemPasswordChar = true, BackColor = Bouton, ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 10, 0, 4), Font = new Font("Segoe UI", 11f),
+            Width = Largeur, UseSystemPasswordChar = true, BackColor = Color.FromArgb(0x32, 0x3d, 0x4b), ForeColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 0, 0, 4), Font = new Font("Segoe UI", 11f),
         });
+        Shown += (_, _) => saisie.Focus();
         etat = Paragraphe(Nexus.Cle() != null ? "Une clé est déjà enregistrée : en coller une nouvelle la remplace." : "", Pale, 24);
         garder = BoutonBas("Enregistrer", Accent);
         var page = BoutonBas("Ouvrir la page Nexus", Bouton);

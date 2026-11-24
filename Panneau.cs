@@ -13,9 +13,9 @@ sealed class Panneau : Form
                           Titre = Color.White, Texte = Color.FromArgb(0xc7, 0xd5, 0xe0), Pale = Color.FromArgb(0x8f, 0x98, 0xa0),
                           Accent = Color.FromArgb(0x66, 0xc0, 0xf4);
 
-    const int L = 300, H = 558, Marge = 16;
-    // Lignes : 1 épingler, 2 ouverture, 3 fermeture, 4 couleur de la languette, 5 afficher la languette, 6 gouttière, 7 statut volet ouvert, 8 regrouper les chats, 9 démarrage, 10 quitter.
-    static readonly (int haut, int bas)[] Lignes = [(0, 0), (66, 120), (120, 180), (180, 240), (240, 286), (286, 330), (330, 374), (374, 418), (418, 462), (462, 506), (516, 554)];
+    const int L = 300, H = 602, Marge = 16;
+    // Lignes : 1 épingler, 2 ouverture, 3 fermeture, 4 couleur de la languette, 5 afficher la languette, 6 gouttière, 7 statut volet ouvert, 8 regrouper les chats, 9 démarrage, 10 clé API Nexus, 11 quitter.
+    static readonly (int haut, int bas)[] Lignes = [(0, 0), (66, 120), (120, 180), (180, 240), (240, 286), (286, 330), (330, 374), (374, 418), (418, 462), (462, 506), (506, 550), (560, 598)];
     public static readonly string[] Couleurs = ["171d25", "3d4450", "35383c"];
     const int Pastille = 22, EcartPastilles = 10;
     const int MaxOuverture = 2000, MaxFermeture = 5000;
@@ -25,6 +25,7 @@ sealed class Panneau : Form
     readonly string version;
     readonly Bitmap logo = Icone.Charger(64).ToBitmap();
     int survol, glisse, survolCouleur = -1;
+    bool cleNexus;   // clé API Nexus enregistrée (lue à l'ouverture du panneau)
     long cacheA;
 
     public Panneau(Volet v, Reglages r)
@@ -80,6 +81,7 @@ sealed class Panneau : Form
         int y = c.Y >= z.Bottom ? z.Bottom - Height - m : c.Y <= z.Top ? z.Top + m : Math.Clamp(c.Y - Height - m, z.Top + m, z.Bottom - Height - m);
         Location = new Point(x, y);
         survol = 0;
+        cleNexus = Nexus.Cle() != null;
         Show();
         Activate();
         Native.Activer(Handle);
@@ -169,7 +171,8 @@ sealed class Panneau : Form
             case 7: reglages.StatutSiOuvert = !reglages.StatutSiOuvert; reglages.Enregistrer(); volet.Recolorer(); break;
             case 8: reglages.RegrouperChats = !reglages.RegrouperChats; reglages.Enregistrer(); volet.AppliquerRegroupement(); break;
             case 9: Volet.BasculerDemarrage(); break;
-            case 10: Hide(); volet.Quitter(); return;
+            case 10: Hide(); new FenetreCleNexus().Show(); return;   // Kev 24/11 : la clé doit se trouver dans les réglages
+            case 11: Hide(); volet.Quitter(); return;
         }
         Invalidate();
     }
@@ -254,13 +257,18 @@ sealed class Panneau : Form
         // 9. Démarrage.
         g.DrawString("Lancer avec Windows", fTexte, bTexte, Marge, Lignes[9].haut + 13);
         Interrupteur(g, L - Marge - 40, Lignes[9].haut + 12, Volet.AuDemarrage());
-        Trait(g, 511);
+        // 10. Clé API Nexus (retéléchargement des mods depuis la disquette).
+        g.DrawString("Clé API Nexus", fTexte, bTexte, Marge, Lignes[10].haut + 4);
+        g.DrawString("retéléchargement des mods (Premium)", fPetit, bPale, Marge, Lignes[10].haut + 23);
+        g.DrawString(cleNexus ? "enregistrée ›" : "à ajouter ›", fPetit, cleNexus ? bAccent : bPale,
+            new RectangleF(0, Lignes[10].haut + 15, L - Marge, 16), aDroite);
+        Trait(g, 555);
 
-        // 10. Quitter.
-        var bQuitter = survol == 10 ? bTitre : bPale;
-        g.DrawString(((char)0xE7E8).ToString(), fIcone, bQuitter, Marge, Lignes[10].haut + 12);
-        g.DrawString("Quitter Steem", fTexte, bQuitter, Marge + 22, Lignes[10].haut + 10);
-        g.DrawString("la liste reprend sa place", fPetit, bPale, new RectangleF(0, Lignes[10].haut + 12, L - Marge, 16), aDroite);
+        // 11. Quitter.
+        var bQuitter = survol == 11 ? bTitre : bPale;
+        g.DrawString(((char)0xE7E8).ToString(), fIcone, bQuitter, Marge, Lignes[11].haut + 12);
+        g.DrawString("Quitter Steem", fTexte, bQuitter, Marge + 22, Lignes[11].haut + 10);
+        g.DrawString("la liste reprend sa place", fPetit, bPale, new RectangleF(0, Lignes[11].haut + 12, L - Marge, 16), aDroite);
     }
 
     void Curseur(Graphics g, int ligne, string titre, int ms, int max, Font fTexte, Font fPetit, Brush bTexte, Brush bAccent, StringFormat aDroite)
