@@ -25,6 +25,12 @@ static class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "--cle-nexus")
+        {
+            // Fenêtre seule pour coller la clé API Nexus (indépendante de l'instance qui tourne).
+            Application.Run(new FenetreCleNexus());
+            return;
+        }
         if (args.Length > 1 && args[0] == "--apercu")
         {
             // Couleur de fond facultative (RRGGBB) pour comparer des teintes de languette.
