@@ -51,6 +51,7 @@
       icone: '<path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z"/>' },
   ];
   const CLASSE = 'steem-bouton';
+  const TAILLE = 'steem-taille';
 
   // Infobulle de Steem (0.15.6) : celle de Steam (attribut title) coupait le texte dans un cadre trop petit.
   const BULLE = 'steem-bulle';
@@ -178,10 +179,39 @@
       for (const barre of barres) {
         if (barre.querySelectorAll(':scope > .' + CLASSE).length === BOUTONS.length) continue;
         for (const x of barre.querySelectorAll(':scope > .' + CLASSE)) x.remove();
-        const debut = barre.firstChild;
+        const t = barre.querySelector(':scope > .' + TAILLE);   // la taille reste devant les boutons
+        const debut = t ? t.nextSibling : barre.firstChild;
         for (const d of BOUTONS) barre.insertBefore(creer(doc, appid, d), debut);
       }
       for (const b of doc.querySelectorAll('.steem-sauvegardes.' + CLASSE)) led(b, appid, o);
+
+      // Place occupée et disque, à gauche de « Désinstaller » (« 56,4 Go sur C:\ », Kev 24/11) : détails de Steam.
+      const texteTaille = (() => {
+        let d = null;
+        try { d = appDetailsStore.GetAppDetails(appid); } catch { }
+        const octets = Number((d && d.lDiskUsageBytes) || (o && o.size_on_disk) || 0);
+        const dossier = (d && d.strInstallFolder) || '';
+        if (!octets) return '';
+        const go = octets / 1073741824;
+        const taille = go >= 1 ? go.toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' Go'
+          : (octets / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' Mo';
+        const disque = /^[A-Za-z]:/.test(dossier) ? dossier.slice(0, 2).toUpperCase() + '\\' : '';
+        return taille + (disque ? ' sur ' + disque : '');
+      })();
+      for (const x of doc.querySelectorAll('.' + TAILLE))
+        if (!barres.includes(x.parentElement) || x.dataset.v !== VERSION) x.remove();
+      for (const barre of barres) {
+        let t = barre.querySelector(':scope > .' + TAILLE);
+        if (!t) {
+          t = doc.createElement('div');
+          t.className = TAILLE;
+          t.dataset.v = VERSION;
+          t.style.cssText = 'display:flex;align-items:center;padding:0 10px 0 4px;font-size:12px;color:#8f98a0;white-space:nowrap;cursor:default';
+          barre.insertBefore(t, barre.firstChild);
+        }
+        if (t.textContent !== texteTaille) t.textContent = texteTaille;
+        t.title = (() => { try { return appDetailsStore.GetAppDetails(appid).strInstallFolder || ''; } catch { return ''; } })();
+      }
     } catch (e) { /* Steam en cours de chargement : prochain tour */ }
   };
 
